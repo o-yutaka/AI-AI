@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from pydantic import ValidationError
 import pytest
+from pydantic import ValidationError
 
-from control_plane.errors import InvalidRunStateError
+from control_plane.errors import IdempotencyConflictError, InvalidRunStateError
 from control_plane.models import (
     ActionContract,
     ApprovalDecision,
@@ -228,6 +228,56 @@ def test_idempotency_executes_once_and_returns_same_run() -> None:
 
     assert first.run_id == second.run_id
     assert calls == 1
+
+
+def test_request_fingerprint_is_stable_across_set_insertion_order() -> None:
+    runtime = AgentRuntime()
+    first = RunRequest(
+        goal="resolve customer request",
+        observation={"ticket_id": "T-100"},
+        contract=ActionContract(
+            version="support-v1",
+            allowed_action_ids={"reply", "escalate"},
+            granted_permissions={"ticket:write", "ticket:read"},
+        ),
+        candidates=[
+            candidate(
+                "reply",
+                permissions={"ticket:read", "ticket:write"},
+            )
+        ],
+        idempotency_key="stable-set-order",
+    )
+    second = RunRequest(
+        goal="resolve customer request",
+        observation={"ticket_id": "T-100"},
+        contract=ActionContract(
+            version="support-v1",
+            allowed_action_ids={"escalate", "reply"},
+            granted_permissions={"ticket:read", "ticket:write"},
+        ),
+        candidates=[
+            candidate(
+                "reply",
+                permissions={"ticket:write", "ticket:read"},
+            )
+        ],
+        idempotency_key="stable-set-order",
+    )
+
+    first_trace = runtime.create_run(first)
+    second_trace = runtime.create_run(second)
+    assert first_trace.run_id == second_trace.run_id
+
+
+def test_idempotency_key_rejects_different_request() -> None:
+    runtime = AgentRuntime()
+    first = request_for(candidate("reply"), idempotency_key="ticket-T-100")
+    second = request_for(candidate("escalate"), idempotency_key="ticket-T-100")
+    runtime.create_run(first)
+
+    with pytest.raises(IdempotencyConflictError):
+        runtime.create_run(second)
 
 
 def test_executor_failure_is_recorded_in_trace() -> None:
