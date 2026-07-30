@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
@@ -9,16 +9,16 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
 
 
-class RunStatus(str, Enum):
+class RunStatus(StrEnum):
     COMPLETED = "completed"
     WAITING_APPROVAL = "waiting_approval"
     REJECTED = "rejected"
@@ -26,7 +26,7 @@ class RunStatus(str, Enum):
     FAILED = "failed"
 
 
-class ApprovalDecision(str, Enum):
+class ApprovalDecision(StrEnum):
     APPROVE = "approve"
     REJECT = "reject"
 
