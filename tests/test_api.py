@@ -107,3 +107,16 @@ def test_idempotency_conflict_returns_409() -> None:
 
     assert client.post("/v1/runs", json=first).status_code == 201
     assert client.post("/v1/runs", json=second).status_code == 409
+
+
+def test_cors_allows_local_nextjs_dashboard() -> None:
+    client = TestClient(create_app(AgentRuntime()))
+    response = client.options(
+        "/v1/runs",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
