@@ -1,119 +1,69 @@
-# Case Study: Stateful Competition Agent as an Enterprise AI Pattern
+# Case Study: Competition Agent as a Business-Automation Pattern
 
 ## Context
 
-The source project is a decision agent connected to an official turn-based simulation engine. The engine exposes the current observation and a list of valid options; the agent must return valid option indexes under strict runtime constraints.
+The source project is a decision agent connected to an official turn-based simulation engine. At each decision point the engine exposes an observation and the actions currently available. The agent must return a valid choice under strict runtime constraints.
 
-The public portfolio focuses on the transferable engineering patterns rather than proprietary competition assets.
+This public repository does **not** copy the private engine, submission bundle, card data, or competition-specific policy code. It implements the transferable control-plane pattern with a customer-support example that can be run and tested publicly.
 
-## Problem
+## Transferable engineering problem
 
-A naive agent can score the currently visible options and choose the largest score. That approach fails when:
+A naive agent can score all visible actions and choose the highest number. That is insufficient when:
 
-- One action is part of a multi-step selection flow
-- Hidden information is accidentally assumed
-- An immediate gain destroys the next-turn route
-- An action consumes a resource needed for the actual objective
-- External option ordering changes
-- A fallback returns an invalid or empty action
+- An action is not present in the current external contract
+- The caller lacks permission to execute it
+- A high-impact action lacks evidence
+- A multi-step workflow requires approval before execution
+- An immediate gain damages a longer route
+- Duplicate execution would produce a second side effect
+- An external tool times out or raises an error
 
-## Implemented engineering pattern
+## Mapping
 
-```text
-Official Engine Observation
-        -> Observation Adapter
-        -> Typed Action Candidates
-        -> Hierarchical Route Planning
-        -> Risk / Value Evaluation
-        -> Contract and Policy Checks
-        -> Valid Option Index
-        -> Transition Audit
-        -> Regression Evaluation
-```
+| Competition constraint | Business-agent equivalent | Public implementation |
+|---|---|---|
+| Engine-provided valid options | Current API/tool allow-list | `ActionContract.allowed_action_ids` |
+| Hidden or unavailable state | Unverified business data | Observation is caller-supplied and fingerprinted |
+| Action-specific requirements | User/API permissions | `required_permissions` gate |
+| High-impact resource use | Refund, deletion, external message | Risk, evidence, reversibility, approval gate |
+| Option selection | Deterministic action ranking | Explicit rank order with tests |
+| Repeated engine step | Duplicate side effect | Idempotency key |
+| Engine error | SaaS/API failure | Structured `ExecutionError` and failed trace |
+| Match replay | Agent execution trace | Timestamped audit events and stored decision trace |
 
-## Transfer to business automation
-
-| Competition constraint | Business equivalent |
-|---|---|
-| Engine-provided valid options | Allowed API operations and user permissions |
-| Hidden game information | Private, unavailable, or unverified business data |
-| Multi-step card selection | Stateful approval or form workflow |
-| Resource preservation | Cost, inventory, rate-limit, and staff constraints |
-| Turn route | Multi-step business process |
-| Illegal action | Invalid API call or unauthorized operation |
-| Match replay | Agent execution trace |
-| Policy comparison | A/B evaluation of automation policies |
-
-## Reliability work demonstrated
-
-### Contract-first integration
-
-The external engine is treated as the source of truth. General domain assumptions cannot override the actual options and selection constraints returned at runtime.
-
-### Hierarchical planning
-
-The agent separates long-horizon goals from the immediate executable action:
+## Public execution path
 
 ```text
-Outcome objective
-    -> board or workflow objective
-        -> turn or process route
-            -> option index or API call
+Observation
+    + current contract
+    + granted permissions
+    + typed candidates
+        -> reject unavailable actions
+        -> reject actions with missing permissions
+        -> reject high-risk actions without evidence
+        -> deterministically rank remaining actions
+        -> request approval for high-impact action
+        -> approve or reject with identity and reason
+        -> execute once
+        -> preserve result or structured failure
 ```
 
-### Search and evaluation
+## What the source project adds
 
-Candidate routes can be explored and compared without mutating sibling branches. The runtime distinguishes experimental search results from promoted production policy.
+The private source project applies related ideas to a much larger domain-specific state and action space, including multi-step engine selections, longer-horizon route planning, policy comparison, replay analysis, and regression gates. Those claims are contextual background rather than public reproducible evidence in this repository.
 
-### Anomaly handling
+## What an employer can verify here
 
-The system records invalid observations, unexpected transitions, empty candidate sets, fallback use, timeouts, and engine errors rather than hiding them.
+An employer can clone this repository and verify:
 
-### Promotion gates
+- FastAPI request validation
+- Contract and permission enforcement
+- High-risk evidence policy
+- Human approval and rejection paths
+- Deterministic decision behavior
+- Duplicate-execution protection
+- Structured failure recording
+- Unit and HTTP API tests
+- Docker and CI configuration
 
-Changes are checked through focused tests, fixed scenarios, smoke runs, and comparative evaluation before promotion.
-
-## Evidence snapshots from development
-
-The project history includes examples of:
-
-- Focused regression suites completing with all tests passing
-- Official-engine smoke runs with zero reported anomalies in measured runs
-- Paired policy comparisons rather than relying on isolated wins
-- Explicit HOLD decisions when an experiment improved one metric but failed the full promotion gate
-- Contract fixes for optional selections where a minimum count of zero had previously been incorrectly coerced to one
-
-These examples demonstrate engineering discipline: a change is not called successful merely because it appears plausible or wins a small sample.
-
-## What an employer should infer
-
-This work demonstrates ability to build agents that:
-
-- Operate against strict external contracts
-- Manage stateful multi-step workflows
-- Separate planning, validation, and execution
-- Preserve audit evidence
-- Evaluate policy changes quantitatively
-- Reject unsafe or unsupported actions
-- Integrate Python runtime logic with external engines
-
-## Recommended live demonstration
-
-A public business-oriented demo can reuse the same control plane with a mock support workflow:
-
-```text
-Incoming customer request
-    -> classify intent
-    -> retrieve account context
-    -> propose actions
-    -> block high-risk refund action
-    -> request human approval
-    -> execute approved API call
-    -> record trace and outcome
-```
-
-The competition adapter proves the difficult runtime behavior. The support adapter makes the value immediately understandable to an AI automation employer or client.
-
-## Confidentiality boundary
-
-This repository does not publish competition engine binaries, protected card data, private submissions, API credentials, or other restricted assets. It documents the reusable architecture and engineering evidence only.
+The distinction matters: the competition work explains where the architecture came from; the code in this repository is the evidence that can be inspected and executed publicly.
