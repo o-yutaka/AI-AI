@@ -1,4 +1,7 @@
+import os
+
 from fastapi import FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 
 from control_plane.errors import (
     IdempotencyConflictError,
@@ -19,6 +22,18 @@ def create_app(runtime: AgentRuntime | None = None) -> FastAPI:
         ),
     )
     agent_runtime = runtime or AgentRuntime()
+    origins = [
+        origin.strip()
+        for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+        if origin.strip()
+    ]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type"],
+    )
 
     @app.get("/health")
     def health() -> dict[str, str]:
