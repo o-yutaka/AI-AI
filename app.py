@@ -1,6 +1,10 @@
 from fastapi import FastAPI, HTTPException, status
 
-from control_plane.errors import InvalidRunStateError, UnknownRunError
+from control_plane.errors import (
+    IdempotencyConflictError,
+    InvalidRunStateError,
+    UnknownRunError,
+)
 from control_plane.models import ApprovalRequest, DecisionTrace, RunRequest
 from control_plane.runtime import AgentRuntime
 
@@ -26,7 +30,10 @@ def create_app(runtime: AgentRuntime | None = None) -> FastAPI:
         status_code=status.HTTP_201_CREATED,
     )
     def create_run(request: RunRequest) -> DecisionTrace:
-        return agent_runtime.create_run(request)
+        try:
+            return agent_runtime.create_run(request)
+        except IdempotencyConflictError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     @app.get("/v1/runs", response_model=list[DecisionTrace])
     def list_runs() -> list[DecisionTrace]:
