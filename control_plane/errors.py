@@ -4,3 +4,7 @@ class UnknownRunError(KeyError):
 
 class InvalidRunStateError(ValueError):
     pass
+
+
+class IdempotencyConflictError(ValueError):
+    pass
