@@ -1,171 +1,86 @@
 # Reusable AI Agent Architecture
 
-## Objective
-
-Provide a domain-independent runtime for agents that must interact with external systems safely and measurably.
-
-## Layers
-
-### 1. Observation Adapter
-
-Transforms external state into a stable internal schema.
-
-Responsibilities:
-
-- Preserve source identifiers and option ordering
-- Distinguish public, private, and unavailable information
-- Reject malformed or incomplete observations
-- Produce deterministic state fingerprints
-
-### 2. Candidate Compiler
-
-Converts currently available external actions into typed candidates.
-
-Responsibilities:
-
-- Never invent unavailable actions
-- Preserve action indexes and selection constraints
-- Attach preconditions, expected effects, and risk metadata
-- Separate optional from mandatory selections
-
-### 3. Hierarchical Planner
-
-Plans at multiple horizons rather than scoring every action with one flat function.
+## Implemented boundary
 
 ```text
-Business Goal
-    -> Workflow Plan
-        -> Step Route
-            -> Executable Action
+FastAPI request
+    -> typed RunRequest
+    -> current action contract
+    -> candidate eligibility checks
+    -> deterministic ranking
+    -> policy gate
+    -> approval or rejection
+    -> executor
+    -> immutable-style stored trace copy
 ```
 
-This separation prevents a locally attractive action from silently breaking the longer objective.
+The current reference implementation is intentionally small and in-memory. It demonstrates control flow and invariants, not production persistence.
 
-### 4. Evaluator
+## Implemented invariants
 
-Scores routes using explicit criteria:
+1. Candidate IDs must be unique.
+2. An action outside the current contract cannot execute.
+3. Required permissions must be granted.
+4. High-risk actions require evidence.
+5. High-risk or irreversible actions require a named human decision.
+6. A rejected action is never executed.
+7. An idempotency key cannot execute the same request twice.
+8. Executor exceptions become structured failed traces.
+9. Retrieval returns a defensive copy rather than the stored object.
+10. Candidate tie-breaking is deterministic.
 
-- Goal progress
-- Resource use
-- Reversibility
-- Failure risk
-- Information quality
-- Expected latency and cost
-- Policy compliance
+## Components
 
-### 5. Policy Gate
+### Action contract
 
-Applies hard constraints before execution.
+The contract carries a version, the currently allowed action IDs, and granted permissions. This maps to an external engine option list, a SaaS API capability document, or a user's authorization scope.
 
-Examples:
+### Candidate validation
 
-- Human approval required
-- Action forbidden without evidence
-- External option no longer available
-- Duplicate or cyclic operation detected
-- Cost or latency budget exceeded
+Candidates are rejected before ranking when they are not in the current contract, require missing permissions, or lack evidence required by risk policy.
 
-### 6. Executor
+### Deterministic ranking
 
-Executes exactly one validated action and records the result.
+Eligible candidates are sorted by:
 
-Required controls:
+1. Higher expected value
+2. Lower risk
+3. Reversible before irreversible
+4. Lexicographically smaller action ID
 
-- Timeout
-- Retry policy
-- Idempotency key
-- Safe fallback
-- Structured error classification
-- No silent exception swallowing
+The tie-break rules are explicit and regression-tested.
 
-### 7. Audit and Telemetry
+### Approval gate
 
-Every run should preserve:
+High-risk or irreversible selected actions enter `waiting_approval`. A named approver must submit either `approve` or `reject` with a reason. Rejected runs never call the executor.
 
-```text
-run_id
-state fingerprint
-goal
-candidate actions
-selected action
-rejected actions and reasons
-policy decisions
-evidence references
-external response
-latency
-cost
-final status
-```
+### Audit trace
 
-### 8. Evaluation Harness
+Each trace records:
 
-Policy changes are not promoted from intuition alone.
-
-A promotion gate should include:
-
-- Fixed scenario fixtures
-- Contract tests for external APIs
-- Regression tests for previously solved cases
-- Error, timeout, and invalid-action counts
-- Quality or task-success metrics
-- Before/after comparison
-
-## Domain adapters
-
-The control plane should remain independent from each target system.
-
-```text
-control_plane/
-  planner/
-  evaluator/
-  policy/
-  runtime/
-  telemetry/
-  evaluation/
-
-adapters/
-  competition_engine/
-  crm/
-  email/
-  rag/
-  ticketing/
-```
-
-## FastAPI boundary
-
-Suggested service boundaries:
-
-```text
-POST /runs                 create a run
-GET  /runs/{id}            retrieve state
-POST /runs/{id}/approve    resolve an approval gate
-POST /runs/{id}/cancel     cancel execution
-GET  /runs/{id}/trace      inspect decision evidence
-POST /evaluations          execute scenario suites
-GET  /metrics              operational metrics
-```
-
-## Next.js operations view
-
-The dashboard should prioritize evidence over decorative chat output.
-
-Recommended panels:
-
-- Current goal and route
+- Observation fingerprint
+- Contract version
+- All candidates
+- Eligible action IDs
+- Rejected candidates and reasons
+- Policy checks
 - Selected action
-- Rejected candidates with reasons
-- Policy-gate status
-- Tool calls and external responses
-- Latency, cost, success rate, and errors
-- Evaluation results by policy version
+- Approval identity and reason
+- Execution result or structured error
+- Timestamped events
+- Revision number
 
-## Reliability contract
+## Production extension points
 
-A production-ready agent must satisfy these invariants:
+The following are deliberately outside the current implementation:
 
-1. It never executes an action absent from the current external contract.
-2. It never treats unavailable information as observed fact.
-3. It records why the chosen action beat its alternatives.
-4. It fails closed when required evidence is missing.
-5. It can replay and evaluate decisions from stored traces.
-6. It separates experimental policies from promoted policies.
+- PostgreSQL event and run repositories
+- Authentication, RBAC, and tenant isolation
+- Durable job queue and workers
+- Timeout and retry policies around network tools
+- OpenAI-compatible model routing
+- Next.js operations dashboard
+- OpenTelemetry metrics and traces
+- Real CRM, email, RAG, and billing adapters
+
+The interfaces should be extended without weakening the implemented invariants.
