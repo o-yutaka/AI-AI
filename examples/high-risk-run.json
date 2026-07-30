@@ -1,0 +1,27 @@
+{
+  "goal": "Issue a policy-compliant refund",
+  "observation": {
+    "ticket_id": "T-101",
+    "refund_amount": 12000
+  },
+  "contract": {
+    "version": "support-v1",
+    "allowed_action_ids": ["refund"],
+    "granted_permissions": ["refund:write"]
+  },
+  "candidates": [
+    {
+      "action_id": "refund",
+      "name": "Issue refund",
+      "tool": "billing_api",
+      "operation": "refund",
+      "payload": {"amount": 12000, "currency": "JPY"},
+      "expected_value": 0.9,
+      "risk": "high",
+      "reversible": false,
+      "required_permissions": ["refund:write"],
+      "evidence": ["ticket/T-101/refund-policy"]
+    }
+  ],
+  "idempotency_key": "ticket-T-101-refund-v1"
+}
