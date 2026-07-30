@@ -1,9 +1,10 @@
 # Reusable AI Agent Architecture
 
-## Implemented boundary
+## Implemented full-stack boundary
 
 ```text
-FastAPI request
+Next.js dashboard
+    -> FastAPI request
     -> typed RunRequest
     -> current action contract
     -> candidate eligibility checks
@@ -11,10 +12,11 @@ FastAPI request
     -> policy gate
     -> approval or rejection
     -> executor
-    -> immutable-style stored trace copy
+    -> stored trace copy
+    -> dashboard inspection
 ```
 
-The current reference implementation is intentionally small and in-memory. It demonstrates control flow and invariants, not production persistence.
+The implementation is intentionally small and uses in-memory storage. It demonstrates control flow and invariants, not production persistence.
 
 ## Implemented invariants
 
@@ -24,20 +26,22 @@ The current reference implementation is intentionally small and in-memory. It de
 4. High-risk actions require evidence.
 5. High-risk or irreversible actions require a named human decision.
 6. A rejected action is never executed.
-7. An idempotency key cannot execute the same request twice.
-8. Executor exceptions become structured failed traces.
-9. Retrieval returns a defensive copy rather than the stored object.
-10. Candidate tie-breaking is deterministic.
+7. Repeating the same request with the same idempotency key does not execute twice.
+8. Reusing an idempotency key for different input is rejected.
+9. Executor exceptions become structured failed traces.
+10. Retrieval returns a defensive copy rather than the stored object.
+11. Set ordering cannot change request fingerprints.
+12. Candidate tie-breaking is deterministic.
 
 ## Components
 
 ### Action contract
 
-The contract carries a version, the currently allowed action IDs, and granted permissions. This maps to an external engine option list, a SaaS API capability document, or a user's authorization scope.
+The contract carries a version, currently allowed action IDs, and granted permissions. This maps to an external engine option list, a SaaS capability document, or a user authorization scope.
 
 ### Candidate validation
 
-Candidates are rejected before ranking when they are not in the current contract, require missing permissions, or lack evidence required by risk policy.
+Candidates are rejected before ranking when they are absent from the current contract, require missing permissions, or lack evidence required by risk policy.
 
 ### Deterministic ranking
 
@@ -48,17 +52,16 @@ Eligible candidates are sorted by:
 3. Reversible before irreversible
 4. Lexicographically smaller action ID
 
-The tie-break rules are explicit and regression-tested.
-
 ### Approval gate
 
-High-risk or irreversible selected actions enter `waiting_approval`. A named approver must submit either `approve` or `reject` with a reason. Rejected runs never call the executor.
+High-risk or irreversible selected actions enter `waiting_approval`. A named approver submits `approve` or `reject` with a reason. Rejected runs never call the executor.
 
 ### Audit trace
 
 Each trace records:
 
 - Observation fingerprint
+- Request fingerprint
 - Contract version
 - All candidates
 - Eligible action IDs
@@ -70,17 +73,16 @@ Each trace records:
 - Timestamped events
 - Revision number
 
+### Operations dashboard
+
+The Next.js client exposes the runtime behavior directly rather than presenting a decorative chat screen. It shows decisions, rejected alternatives, policy checks, approval state, execution events, and trace identity.
+
 ## Production extension points
 
-The following are deliberately outside the current implementation:
-
-- PostgreSQL event and run repositories
+- PostgreSQL run repository and append-only event store
 - Authentication, RBAC, and tenant isolation
-- Durable job queue and workers
+- Durable queue and worker processes
 - Timeout and retry policies around network tools
-- OpenAI-compatible model routing
-- Next.js operations dashboard
+- OpenAI-compatible model/planner routing
 - OpenTelemetry metrics and traces
 - Real CRM, email, RAG, and billing adapters
-
-The interfaces should be extended without weakening the implemented invariants.
