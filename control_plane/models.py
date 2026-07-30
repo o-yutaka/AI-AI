@@ -117,6 +117,7 @@ class DecisionTrace(BaseModel):
     goal: str
     observation: dict[str, Any]
     observation_fingerprint: str
+    request_fingerprint: str
     contract_version: str
     candidates: list[CandidateAction]
     eligible_action_ids: list[str] = Field(default_factory=list)
