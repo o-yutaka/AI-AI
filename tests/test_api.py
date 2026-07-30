@@ -95,3 +95,15 @@ def test_decision_for_completed_run_returns_409() -> None:
         },
     )
     assert response.status_code == 409
+
+
+def test_idempotency_conflict_returns_409() -> None:
+    client = TestClient(create_app(AgentRuntime()))
+    first = payload()
+    first["idempotency_key"] = "ticket-T-100"
+    second = payload()
+    second["idempotency_key"] = "ticket-T-100"
+    second["goal"] = "different goal"
+
+    assert client.post("/v1/runs", json=first).status_code == 201
+    assert client.post("/v1/runs", json=second).status_code == 409
