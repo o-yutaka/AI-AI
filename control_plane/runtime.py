@@ -6,7 +6,7 @@ from collections.abc import Callable
 from threading import RLock
 from typing import Any
 
-from .errors import InvalidRunStateError, UnknownRunError
+from .errors import IdempotencyConflictError, InvalidRunStateError, UnknownRunError
 from .models import (
     ApprovalDecision,
     ApprovalRecord,
@@ -38,7 +38,7 @@ class AgentRuntime:
     def __init__(self, executor: Executor | None = None) -> None:
         self._executor = executor or self._default_executor
         self._runs: dict[str, DecisionTrace] = {}
-        self._idempotency_index: dict[str, str] = {}
+        self._idempotency_index: dict[str, tuple[str, str]] = {}
         self._lock = RLock()
 
     @staticmethod
@@ -63,13 +63,45 @@ class AgentRuntime:
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     @staticmethod
+    def _request_fingerprint(request: RunRequest) -> str:
+        candidates: list[dict[str, Any]] = []
+        for candidate in request.candidates:
+            candidate_payload = candidate.model_dump(mode="json")
+            candidate_payload["required_permissions"] = sorted(
+                candidate.required_permissions
+            )
+            candidates.append(candidate_payload)
+
+        payload = {
+            "goal": request.goal,
+            "observation": request.observation,
+            "contract": {
+                "version": request.contract.version,
+                "allowed_action_ids": sorted(request.contract.allowed_action_ids),
+                "granted_permissions": sorted(request.contract.granted_permissions),
+            },
+            "candidates": candidates,
+        }
+        canonical = json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            default=str,
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    @staticmethod
     def _clone(trace: DecisionTrace) -> DecisionTrace:
         return trace.model_copy(deep=True)
 
     def _store(self, trace: DecisionTrace) -> None:
         self._runs[trace.run_id] = self._clone(trace)
         if trace.idempotency_key:
-            self._idempotency_index[trace.idempotency_key] = trace.run_id
+            self._idempotency_index[trace.idempotency_key] = (
+                trace.run_id,
+                trace.request_fingerprint,
+            )
 
     @staticmethod
     def _rank_candidates(candidates: list[CandidateAction]) -> list[CandidateAction]:
@@ -102,9 +134,15 @@ class AgentRuntime:
 
     def create_run(self, request: RunRequest) -> DecisionTrace:
         with self._lock:
+            request_fingerprint = self._request_fingerprint(request)
             if request.idempotency_key:
-                existing_run_id = self._idempotency_index.get(request.idempotency_key)
-                if existing_run_id:
+                existing = self._idempotency_index.get(request.idempotency_key)
+                if existing:
+                    existing_run_id, existing_fingerprint = existing
+                    if existing_fingerprint != request_fingerprint:
+                        raise IdempotencyConflictError(
+                            "idempotency_key was already used for a different request"
+                        )
                     return self._clone(self._runs[existing_run_id])
 
             rejected: list[RejectedAction] = []
@@ -159,6 +197,7 @@ class AgentRuntime:
                 goal=request.goal,
                 observation=request.observation,
                 observation_fingerprint=self._fingerprint(request.observation),
+                request_fingerprint=request_fingerprint,
                 contract_version=request.contract.version,
                 candidates=request.candidates,
                 eligible_action_ids=[candidate.action_id for candidate in eligible],
