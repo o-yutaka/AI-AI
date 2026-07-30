@@ -1,201 +1,227 @@
 # AI Agent Control Plane
 
-An executable, production-oriented reference for building **stateful, auditable, approval-aware AI agents** with Python and FastAPI.
+[![CI](https://github.com/o-yutaka/AI-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/o-yutaka/AI-AI/actions/workflows/ci.yml)
 
-The architecture is extracted from a competitive decision-agent project connected to a strict external simulation engine. The reusable patterns apply to customer support, CRM operations, document workflows, internal search, and approval-based business automation.
+A working full-stack portfolio for **contract-aware, auditable, human-approved AI agents**.
 
-## Current implementation
+- **Backend:** Python, FastAPI, Pydantic
+- **Frontend:** TypeScript, Next.js App Router, React
+- **Operations:** pytest, Ruff, Docker Compose, GitHub Actions
 
-This repository now includes working code for:
+The architecture is extracted from a stateful competition agent connected to a strict external simulation engine. The public demo translates the same engineering constraints into a customer-support workflow: the agent may execute only currently allowed actions, must respect permissions, requires evidence and human approval for high-impact operations, prevents duplicate side effects, and preserves a complete decision trace.
 
-- Typed agent and action contracts with Pydantic
-- Deterministic candidate selection
-- Policy gates for high-risk or irreversible actions
-- Human approval before execution
-- Decision traces containing candidates, rejected actions, policy checks, and results
-- FastAPI endpoints for creating, reading, and approving runs
-- Unit tests for normal execution and approval-gated execution
-- Docker packaging
-- GitHub Actions CI with Ruff and pytest
+## Run the full stack
 
-It does **not** yet include the planned Next.js dashboard, persistent PostgreSQL storage, a real LLM provider router, or production authentication. Those remain explicit milestones rather than being presented as completed work.
+```bash
+docker compose up --build
+```
+
+Open:
+
+- Dashboard: `http://localhost:3000`
+- FastAPI/OpenAPI: `http://localhost:8000/docs`
+- Health: `http://localhost:8000/health`
+
+The dashboard can run:
+
+1. A low-risk support workflow that executes immediately
+2. A high-risk refund workflow that pauses for approval
+3. Approve or reject the pending action
+4. Inspect selected and rejected actions, policy checks, audit events, result/error, and trace fingerprints
+
+## What is implemented
+
+### Agent runtime
+
+- Versioned external action contract
+- Action allow-list enforcement
+- Per-action permission checks
+- High-risk evidence requirement
+- Deterministic ranking and tie-breaking
+- High-risk and irreversible action approval gate
+- Named approval or rejection with a reason
+- Idempotency protection against duplicate execution
+- Conflict detection when one idempotency key is reused for different input
+- Structured executor-failure recording
+- Observation and request fingerprints
+- Timestamped audit events and revision tracking
+- Defensive-copy in-memory storage
+
+### API
+
+```text
+GET  /health
+POST /v1/runs
+GET  /v1/runs
+GET  /v1/runs/{run_id}
+POST /v1/runs/{run_id}/decision
+```
+
+### Operations dashboard
+
+- Current status and selected action
+- Risk and reversibility
+- Contract version and trace revision
+- Eligible and rejected candidate counts
+- Rejected actions with exact reasons
+- Policy checks and details
+- Human approval/rejection controls
+- Audit-event timeline
+- Result or structured error
+- Observation and request fingerprints
 
 ## Architecture
 
 ```text
-Client / future Next.js dashboard
-              |
-          FastAPI API
-              |
+Next.js Operations Dashboard
+             |
+          FastAPI
+             |
        Agent Runtime
-   +----------+-----------+
-   |          |           |
-Selector   Policy Gate   Audit Trace
-   |          |           |
-   +------ Validated Action
-              |
-        Tool / API Adapter
+  +----------+-----------+
+  |          |           |
+Contract  Candidate    Policy
+ checks     ranking      gate
+  |          |           |
+  +------ selected action
+             |
+    approval / rejection
+             |
+          Executor
+             |
+  audit events + result/error
 ```
 
-The larger reusable architecture is documented in [docs/architecture.md](docs/architecture.md).
-
-## Run locally
+## Local backend development
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
+ruff check .
+pytest -q
 uvicorn app:app --reload
 ```
 
-Windows PowerShell:
+PowerShell:
 
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
+ruff check .
+pytest -q
 uvicorn app:app --reload
 ```
 
-Open the interactive API documentation at `http://127.0.0.1:8000/docs`.
-
-## Docker
+## Local frontend development
 
 ```bash
-docker build -t ai-agent-control-plane .
-docker run --rm -p 8000:8000 ai-agent-control-plane
+cd web
+npm install
+npm run dev
 ```
 
-## API example
+The default API URL is `http://localhost:8000`. Override it at build time with `NEXT_PUBLIC_API_BASE_URL`.
 
-Create a low-risk run that can execute immediately:
+## API examples
+
+Low risk:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/v1/runs \
+curl -X POST http://localhost:8000/v1/runs \
+  -H "Content-Type: application/json" \
+  --data @examples/low-risk-run.json
+```
+
+Approval gated:
+
+```bash
+curl -X POST http://localhost:8000/v1/runs \
+  -H "Content-Type: application/json" \
+  --data @examples/high-risk-run.json
+```
+
+Approve:
+
+```bash
+curl -X POST http://localhost:8000/v1/runs/<run_id>/decision \
   -H "Content-Type: application/json" \
   -d '{
-    "goal": "Resolve a customer support request",
-    "observation": {"customer_tier": "standard"},
-    "candidates": [
-      {
-        "action_id": "reply",
-        "name": "Send approved response",
-        "expected_value": 0.8,
-        "risk": "low",
-        "reversible": true,
-        "evidence": ["knowledge-base/article-12"]
-      },
-      {
-        "action_id": "escalate",
-        "name": "Escalate to operator",
-        "expected_value": 0.5,
-        "risk": "low",
-        "reversible": true
-      }
-    ]
+    "decision": "approve",
+    "approver": "ops@example.com",
+    "reason": "Evidence and policy verified"
   }'
 ```
 
-A high-risk or irreversible selected action returns `waiting_approval` and is not executed until:
+Use `"decision": "reject"` to reject. A rejected run never calls the executor.
 
-```bash
-curl -X POST http://127.0.0.1:8000/v1/runs/<run_id>/approve
-```
+## Why the Pokémon competition work is relevant
 
-## API surface
+| Competition-agent constraint | Business-agent equivalent | Public implementation |
+|---|---|---|
+| Select only engine-provided options | Call only currently allowed APIs/tools | Versioned action contract |
+| Preserve option and workflow state | Preserve transaction state | Stateful run trace |
+| Do not assume hidden information | Do not treat unavailable data as fact | Caller observation + fingerprint |
+| Resource-sensitive decisions | Cost, inventory, permissions, rate limits | Policy metadata and checks |
+| Invalid action is unacceptable | Unauthorized or unsupported API call | Candidate filtering |
+| Replay and policy comparison | Audit and regression evaluation | Decision events and tests |
 
-```text
-GET  /health
-POST /v1/runs
-GET  /v1/runs/{run_id}
-POST /v1/runs/{run_id}/approve
-```
-
-## Core execution contract
-
-```text
-Observation
-    -> receive only caller-provided candidates
-    -> select the strongest current candidate
-    -> record rejected alternatives
-    -> apply risk and reversibility policy
-    -> pause for approval when required
-    -> execute one validated action
-    -> preserve the complete trace
-```
-
-The reference runtime intentionally does not invent tools or actions. In a production adapter, candidate actions must come from the current external API contract and user permissions.
-
-## Why the competition case study matters
-
-The source project operates under constraints stricter than a normal chatbot:
-
-- The agent may select only actions exposed by the external engine.
-- Invalid action indexes are unacceptable.
-- Hidden information cannot be treated as known.
-- Multi-step selections must preserve engine semantics.
-- A locally attractive action can destroy a longer route.
-- Changes require regression tests and measured promotion gates.
-
-Those constraints map directly to enterprise agents using APIs, permissions, approvals, workflow state, and audit evidence.
-
-Read the detailed transfer analysis in [docs/case-study-pokemon.md](docs/case-study-pokemon.md).
+Read [docs/case-study-pokemon.md](docs/case-study-pokemon.md) for the detailed transfer boundary.
 
 ## Repository structure
 
 ```text
 .
-├── app.py                       FastAPI boundary
+├── app.py
 ├── control_plane/
-│   ├── models.py                Typed contracts and traces
-│   └── runtime.py               Selection, policy, approval, execution
-├── tests/test_runtime.py        Runtime regression tests
-├── docs/architecture.md         Target reusable architecture
-├── docs/case-study-pokemon.md   Competition-to-enterprise translation
+│   ├── errors.py
+│   ├── models.py
+│   └── runtime.py
+├── tests/
+│   ├── test_api.py
+│   └── test_runtime.py
+├── web/
+│   ├── app/
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   └── page.tsx
+│   ├── Dockerfile
+│   ├── package.json
+│   └── tsconfig.json
+├── examples/
+├── docs/
 ├── Dockerfile
+├── docker-compose.yml
 ├── pyproject.toml
 └── .github/workflows/ci.yml
 ```
 
-## Test
+## CI gates
 
-```bash
-pytest -q
-ruff check .
-```
+GitHub Actions verifies:
 
-## Engineering principles
+- Ruff
+- pytest on Python 3.11 and 3.12
+- Next.js production build on Node.js 22
+- Backend Docker image build
+- Frontend Docker image build
 
-1. External system contracts are the source of truth.
-2. The agent may execute only currently valid actions.
-3. Planning, policy validation, and execution are separate concerns.
-4. High-impact actions require explicit approval.
-5. Every decision preserves alternatives, evidence, and policy outcomes.
-6. Policy changes require regression evaluation before promotion.
-7. Safe degradation is preferable to an unsupported action.
+## Claim boundary
 
-## What this proves to an employer
+This is a portfolio-grade reference system, not a finished enterprise platform. It currently uses in-memory storage and a deterministic example executor. It does **not** claim production authentication, tenant isolation, PostgreSQL persistence, durable queues, real SaaS connectors, a live LLM provider router, load-test evidence, or production SLOs.
 
-- Python backend and typed domain modeling
-- FastAPI service design
-- Stateful AI-agent execution
-- Human-in-the-loop workflow control
-- Auditability and rejected-action reasoning
-- Testable policy behavior
-- Docker and CI fundamentals
-- Ability to translate a strict decision-agent system into business automation architecture
+See [docs/evidence.md](docs/evidence.md) for the exact distinction between public reproducible evidence and private source-project context.
 
-## Next milestones
+## Next priorities
 
-- PostgreSQL-backed run and audit storage
-- Authentication, authorization, and tenant isolation
-- Idempotency and concurrent-run protection
-- Retry, timeout, and structured tool-error handling
-- OpenAI-compatible provider adapter with fallback policies
-- Evaluation fixtures and measured promotion gates
-- Next.js trace and operations dashboard
-- CRM, email, RAG, and ticketing adapters
+1. PostgreSQL repository and append-only audit store
+2. Authentication, RBAC, and tenant isolation
+3. Async tool executor with timeout and retry policy
+4. OpenAI-compatible planner/provider adapter
+5. CRM, email, RAG, and billing adapters
+6. Evaluation fixtures and measured policy-promotion gates
 
 ## Author
 
-Built by [o-yutaka](https://github.com/o-yutaka) as an AI-agent engineering portfolio focused on reliable business automation.
+Built by [o-yutaka](https://github.com/o-yutaka) as a public AI-agent engineering portfolio focused on reliable business automation.
