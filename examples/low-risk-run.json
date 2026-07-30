@@ -1,0 +1,36 @@
+{
+  "goal": "Resolve a customer support request",
+  "observation": {
+    "ticket_id": "T-100",
+    "customer_tier": "standard"
+  },
+  "contract": {
+    "version": "support-v1",
+    "allowed_action_ids": ["reply", "escalate"],
+    "granted_permissions": ["ticket:write"]
+  },
+  "candidates": [
+    {
+      "action_id": "reply",
+      "name": "Send approved response",
+      "tool": "support_api",
+      "operation": "reply",
+      "expected_value": 0.8,
+      "risk": "low",
+      "reversible": true,
+      "required_permissions": ["ticket:write"],
+      "evidence": ["knowledge-base/article-12"]
+    },
+    {
+      "action_id": "escalate",
+      "name": "Escalate to operator",
+      "tool": "support_api",
+      "operation": "escalate",
+      "expected_value": 0.5,
+      "risk": "low",
+      "reversible": true,
+      "required_permissions": ["ticket:write"]
+    }
+  ],
+  "idempotency_key": "ticket-T-100-v1"
+}
