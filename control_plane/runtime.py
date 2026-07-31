@@ -172,7 +172,18 @@ class AgentRuntime:
                         raise IdempotencyConflictError(
                             "idempotency_key was already used for a different request"
                         )
-                    return self._clone(existing)
+                    replayed = self._clone(existing)
+                    replayed.idempotency_replayed = True
+                    replayed.events.append(
+                        AuditEvent(
+                            event_type="idempotency_replay",
+                            details={
+                                "returned_existing_run": True,
+                                "no_second_execution": True,
+                            },
+                        )
+                    )
+                    return replayed
 
             rejected: list[RejectedAction] = []
             eligible: list[CandidateAction] = []
@@ -323,6 +334,7 @@ class AgentRuntime:
         if selected is None:
             raise InvalidRunStateError("cannot execute a run without a selected action")
 
+        trace.execution_count += 1
         try:
             result = self._executor(selected)
             trace.result = redact_value(
