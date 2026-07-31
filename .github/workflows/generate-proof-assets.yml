@@ -6,6 +6,7 @@ on:
       - feature/portfolio-proof-complete-20260801
     paths-ignore:
       - "requirements.lock.txt"
+      - "requirements.runtime.lock.txt"
       - "web/package-lock.json"
       - "docs/assets/proof/**"
   pull_request:
@@ -42,17 +43,26 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Generate exact Python dependency lock
+      - name: Generate exact Python dependency locks
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
-          pip freeze --exclude-editable | LC_ALL=C sort > requirements.lock.txt
+          python -m venv /tmp/ai-ai-runtime-lock
+          /tmp/ai-ai-runtime-lock/bin/python -m pip install --upgrade pip
+          /tmp/ai-ai-runtime-lock/bin/pip install -e .
+          /tmp/ai-ai-runtime-lock/bin/pip freeze --exclude-editable | LC_ALL=C sort > requirements.runtime.lock.txt
+
+          python -m venv /tmp/ai-ai-dev-lock
+          /tmp/ai-ai-dev-lock/bin/python -m pip install --upgrade pip
+          /tmp/ai-ai-dev-lock/bin/pip install -e ".[dev]"
+          /tmp/ai-ai-dev-lock/bin/pip freeze --exclude-editable | LC_ALL=C sort > requirements.lock.txt
+
+          test -s requirements.runtime.lock.txt
           test -s requirements.lock.txt
       - uses: actions/upload-artifact@v4
         with:
           name: generated-lockfiles
           path: |
             web/package-lock.json
+            requirements.runtime.lock.txt
             requirements.lock.txt
           if-no-files-found: error
 
@@ -120,7 +130,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add requirements.lock.txt web/package-lock.json docs/assets/proof
+          git add requirements.lock.txt requirements.runtime.lock.txt web/package-lock.json docs/assets/proof
           if git diff --cached --quiet; then
             exit 0
           fi
