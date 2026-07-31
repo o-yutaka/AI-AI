@@ -35,7 +35,13 @@ jobs:
         with:
           node-version: "22"
       - run: npm install --no-audit --no-fund
-      - run: npm run build
+      - name: Build GitHub Pages demo
+        env:
+          GITHUB_PAGES: "true"
+          NEXT_PUBLIC_DEMO_MODE: "true"
+        run: npm run build
+      - name: Verify static artifact
+        run: test -f out/index.html
 
   docker:
     runs-on: ubuntu-latest

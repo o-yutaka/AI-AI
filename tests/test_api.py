@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
 
 from app import create_app
+from control_plane.models import CandidateAction
+from control_plane.providers import PlannedRunRequest, PlannerResult
 from control_plane.runtime import AgentRuntime
 
 
@@ -27,12 +29,86 @@ def payload(*, risk: str = "low", evidence: list[str] | None = None) -> dict:
     }
 
 
+def planned_payload() -> dict:
+    return {
+        "goal": "resolve customer request",
+        "observation": {"ticket_id": "T-100"},
+        "contract": {
+            "version": "support-v1",
+            "allowed_action_ids": ["reply"],
+            "granted_permissions": [],
+        },
+        "tools": [
+            {
+                "name": "support_api",
+                "description": "Customer support API",
+                "operations": ["reply"],
+                "input_schema": {"type": "object"},
+            }
+        ],
+    }
+
+
+class FakePlanner:
+    provider_name = "openai-compatible"
+    model = "test-model"
+
+    def plan(self, request: PlannedRunRequest) -> PlannerResult:
+        return PlannerResult(
+            provider=self.provider_name,
+            model=self.model,
+            candidates=[
+                CandidateAction(
+                    action_id="reply",
+                    name="Reply to customer",
+                    tool="support_api",
+                    operation="reply",
+                    payload={"ticket_id": request.observation["ticket_id"]},
+                    expected_value=0.8,
+                )
+            ],
+        )
+
+
 def test_health() -> None:
     client = TestClient(create_app(AgentRuntime()))
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "version": "0.3.0"}
+    assert response.json() == {"status": "ok", "version": "0.4.0"}
+
+
+def test_provider_status_when_unconfigured() -> None:
+    client = TestClient(create_app(AgentRuntime()))
+
+    response = client.get("/v1/provider")
+    assert response.status_code == 200
+    assert response.json() == {
+        "configured": False,
+        "provider": None,
+        "model": None,
+    }
+
+
+def test_planned_run_uses_provider_candidates_then_runtime_policy() -> None:
+    client = TestClient(create_app(AgentRuntime(), planner=FakePlanner()))
+
+    response = client.post("/v1/agent-runs", json=planned_payload())
+    assert response.status_code == 201
+    body = response.json()
+    assert body["status"] == "completed"
+    assert body["selected_action"]["action_id"] == "reply"
+    assert body["observation"]["_planner"] == {
+        "provider": "openai-compatible",
+        "model": "test-model",
+    }
+
+
+def test_planned_run_requires_configured_provider() -> None:
+    client = TestClient(create_app(AgentRuntime()))
+
+    response = client.post("/v1/agent-runs", json=planned_payload())
+    assert response.status_code == 503
 
 
 def test_create_and_get_run() -> None:

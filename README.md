@@ -1,28 +1,47 @@
 # AI Agent Control Plane
 
 [![CI](https://github.com/o-yutaka/AI-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/o-yutaka/AI-AI/actions/workflows/ci.yml)
+[![Live demo](https://img.shields.io/badge/live-demo-b9ff66?style=flat&labelColor=10150a)](https://o-yutaka.github.io/AI-AI/)
 
 A working full-stack reference system for **contract-aware, auditable, human-approved AI agents**.
 
-The project demonstrates the engineering around an AI model: which actions it is allowed to take, why one action was selected, which candidates were rejected, when human approval is mandatory, how duplicate side effects are prevented, and how the complete decision survives a process restart.
+**Live interactive demo:** https://o-yutaka.github.io/AI-AI/
 
-## Engineering proof
+The public browser demo requires no API key and performs no external side effect. It reproduces candidate generation, contract checks, deterministic selection, approval gating, rejection reasons, execution state, and the audit timeline. The backend supports an OpenAI-compatible planner and allow-listed HTTP tool adapters for real integrations.
+
+[![AI Agent Control Plane approval screen](docs/assets/ai-agent-control-plane-live.jpg)](https://o-yutaka.github.io/AI-AI/)
+
+## What this proves
 
 | Concern | Implemented evidence |
 |---|---|
+| LLM integration | OpenAI-compatible `/chat/completions` candidate planner |
+| Model boundary | Model proposes candidates; it never receives direct execution authority |
+| Tool execution | Fixed-host, fixed-method, fixed-path HTTP JSON adapters |
 | API and validation | FastAPI + Pydantic request/response contracts |
-| Allowed tool boundary | Versioned action contract and allow-list filtering |
+| Allowed action boundary | Versioned action contract and allow-list filtering |
 | Authorization | Per-action permission requirements |
 | High-impact safety | Evidence requirement plus named human approval/rejection |
 | Deterministic decisions | Stable ranking, tie-breaking, and request fingerprints |
 | Duplicate prevention | Idempotency key with conflicting-request detection |
 | Auditability | Timestamped events, policy checks, rejected reasons, revisions |
-| Failure handling | Structured executor error recorded in the trace |
+| Failure handling | Provider and executor failures recorded as structured errors |
 | Restart safety | Pluggable repository with durable SQLite implementation |
 | Full-stack operations | Next.js dashboard for run, review, approval, and trace inspection |
-| Delivery | Docker Compose and GitHub Actions |
+| Public delivery | Static interactive GitHub Pages demo plus Docker Compose |
+| Verification | Python 3.11/3.12, Ruff, Next.js build, and two Docker builds in CI |
 
-## Run the full stack
+## Try the public flow
+
+1. Open the live demo.
+2. Run the low-risk workflow and inspect the selected action and lower-ranked rejection.
+3. Run the approval-gated refund.
+4. Verify that the high-impact action has not executed.
+5. Approve or reject it and inspect the revised trace and audit events.
+
+The Pages deployment intentionally uses a browser-local executor. This makes the portfolio safe to operate publicly while preserving the same visible decision and approval lifecycle.
+
+## Run the complete stack
 
 ```bash
 docker compose up --build
@@ -36,21 +55,15 @@ Open:
 
 Docker Compose configures `AGENT_DB_PATH=/data/control-plane.sqlite3` and a named volume. Completed runs, pending approvals, and idempotency records remain available after the API container restarts.
 
-## Demo flow
-
-1. Submit a low-risk support workflow and observe immediate execution.
-2. Submit a high-risk refund workflow with supporting evidence.
-3. Inspect the selected action, lower-ranked candidates, contract checks, and exact rejection reasons.
-4. Approve or reject the pending action with an operator name and reason.
-5. Restart the API container and retrieve the same trace.
-6. Resubmit the same idempotent request and verify that the executor is not called twice.
-
 ## Architecture
 
 ```text
 Next.js Operations Dashboard
              |
           FastAPI
+             |
+  OpenAI-compatible Planner
+     candidate generation
              |
        Agent Runtime
   +----------+-----------+
@@ -62,7 +75,9 @@ Contract  Candidate    Policy
              |
     approval / rejection
              |
-          Executor
+   ToolRegistryExecutor
+             |
+ allow-listed HTTP adapters
              |
   audit events + result/error
              |
@@ -71,39 +86,90 @@ Contract  Candidate    Policy
   in-memory      SQLite
 ```
 
-`AgentRuntime` owns decision policy, not persistence details. It depends on a small `RunRepository` protocol:
+The two critical trust boundaries are deliberate:
 
-- `InMemoryRunRepository` keeps the embedded/test path simple.
-- `SQLiteRunRepository` stores validated `DecisionTrace` JSON, indexes idempotency keys, uses WAL mode, and supports approval continuation after restart.
+1. Provider output is untrusted `CandidateAction` input and must pass the existing contract, permission, evidence, ranking, approval, and idempotency gates.
+2. A selected action can execute only through an adapter registered under an exact tool name. The model cannot choose a host, HTTP method, arbitrary path, redirect target, or secret.
 
-See [`docs/adr/0001-durable-run-store.md`](docs/adr/0001-durable-run-store.md) for the decision, guarantees, trade-offs, and non-goals.
+See:
 
-## Agent runtime
+- [`docs/adr/0001-durable-run-store.md`](docs/adr/0001-durable-run-store.md)
+- [`docs/adr/0002-provider-tool-boundary.md`](docs/adr/0002-provider-tool-boundary.md)
 
-- Versioned external action contract
-- Action allow-list enforcement
-- Per-action permission checks
-- High-risk evidence requirement
-- Deterministic ranking and tie-breaking
-- High-risk and irreversible action approval gate
-- Named approval or rejection with a reason
-- Idempotency protection against duplicate execution
-- Conflict detection when one idempotency key is reused for different input
-- Structured executor-failure recording
-- Observation and request fingerprints
-- Timestamped audit events and revision tracking
-- Defensive-copy repository reads
-- Restart-safe SQLite persistence without an additional database package
+## OpenAI-compatible planner
+
+Configure any endpoint that implements the OpenAI-style chat-completions request shape:
+
+```bash
+export OPENAI_COMPATIBLE_BASE_URL="https://provider.example/v1"
+export OPENAI_COMPATIBLE_MODEL="your-model"
+export OPENAI_COMPATIBLE_API_KEY="your-key"
+```
+
+PowerShell:
+
+```powershell
+$env:OPENAI_COMPATIBLE_BASE_URL = "https://provider.example/v1"
+$env:OPENAI_COMPATIBLE_MODEL = "your-model"
+$env:OPENAI_COMPATIBLE_API_KEY = "your-key"
+```
+
+Provider status:
+
+```bash
+curl http://localhost:8000/v1/provider
+```
+
+Create a provider-planned run through `POST /v1/agent-runs`. The request supplies the goal, observation, current action contract, and tool capability catalog. The provider returns candidates only; the runtime remains the authority.
+
+## Real HTTP tool adapters
+
+Adapters are configured by the operator, not generated by the model. This example allows one support operation against one fixed base URL:
+
+```json
+{
+  "support_api": {
+    "base_url": "https://api.example.com",
+    "headers": {
+      "Authorization": "Bearer ${SUPPORT_API_TOKEN}"
+    },
+    "operations": {
+      "reply": {
+        "method": "POST",
+        "path": "/tickets/{ticket_id}/reply",
+        "payload_mode": "json"
+      }
+    }
+  }
+}
+```
+
+Set it as `TOOL_ADAPTERS_JSON` and provide `SUPPORT_API_TOKEN` separately. Runtime protections include:
+
+- exact tool-name lookup
+- exact configured operation lookup
+- fixed base URL and HTTP method
+- relative traversal-free path templates
+- URL-encoded scalar path parameters
+- environment-only secret resolution
+- disabled redirects
+- request timeout
+- bounded response size
+- structured execution failure in the decision trace
 
 ## API
 
 ```text
 GET  /health
+GET  /v1/provider
+POST /v1/agent-runs
 POST /v1/runs
 GET  /v1/runs
 GET  /v1/runs/{run_id}
 POST /v1/runs/{run_id}/decision
 ```
+
+`POST /v1/runs` accepts caller-supplied candidates for deterministic testing and integrations that already have a planner. `POST /v1/agent-runs` invokes the configured OpenAI-compatible candidate planner first.
 
 ### Low-risk run
 
@@ -135,20 +201,24 @@ curl -X POST http://localhost:8000/v1/runs/<run_id>/decision \
 
 Use `"decision": "reject"` to reject. A rejected run never calls the executor.
 
-## Operations dashboard
+## Runtime guarantees demonstrated
 
-- Current run status and selected action
-- Risk and reversibility
-- Contract version and trace revision
-- Eligible and rejected candidate counts
-- Rejected actions with exact reasons
-- Policy checks and details
-- Human approval/rejection controls
-- Audit-event timeline
-- Result or structured error
+- Versioned external action contract
+- Action allow-list enforcement
+- Per-action permission checks
+- High-risk evidence requirement
+- Deterministic ranking and tie-breaking
+- High-risk and irreversible action approval gate
+- Named approval or rejection with a reason
+- Idempotency protection against duplicate execution
+- Conflict detection when one idempotency key is reused for different input
+- Structured provider and executor failure recording
 - Observation and request fingerprints
+- Timestamped audit events and revision tracking
+- Defensive-copy repository reads
+- Restart-safe SQLite persistence without an additional database package
 
-## Local backend development
+## Local development
 
 ```bash
 python -m venv .venv
@@ -176,9 +246,7 @@ Use SQLite outside Docker:
 AGENT_DB_PATH=.data/control-plane.sqlite3 uvicorn app:app --reload
 ```
 
-Without `AGENT_DB_PATH`, the app uses the in-memory repository.
-
-## Local frontend development
+Frontend:
 
 ```bash
 cd web
@@ -196,25 +264,31 @@ The default API URL is `http://localhost:8000`. Override it at build time with `
 ├── control_plane/
 │   ├── errors.py
 │   ├── models.py
+│   ├── providers.py
 │   ├── runtime.py
-│   └── store.py
+│   ├── store.py
+│   └── tools.py
 ├── tests/
 │   ├── test_api.py
 │   ├── test_persistence.py
-│   └── test_runtime.py
+│   ├── test_providers.py
+│   ├── test_runtime.py
+│   └── test_tools.py
 ├── web/
 │   ├── app/
 │   ├── Dockerfile
 │   └── package.json
-├── examples/
 ├── docs/
 │   ├── adr/
+│   ├── assets/
 │   ├── case-study-pokemon.md
 │   └── evidence.md
+├── .github/workflows/
+│   ├── ci.yml
+│   └── pages.yml
 ├── Dockerfile
 ├── docker-compose.yml
-├── pyproject.toml
-└── .github/workflows/ci.yml
+└── pyproject.toml
 ```
 
 ## Verification gates
@@ -223,15 +297,15 @@ GitHub Actions verifies:
 
 - Ruff
 - pytest on Python 3.11 and 3.12
+- OpenAI-compatible response validation
+- rejection of undeclared provider tool operations
+- fixed-host HTTP adapter execution through `httpx.MockTransport`
+- rejection of unregistered tools and operations
+- restart-safe approval and idempotency
 - Next.js production build on Node.js 22
 - Backend Docker image build
 - Frontend Docker image build
-
-Persistence tests specifically verify:
-
-- a completed idempotent run is not executed again after restart
-- a pending high-risk action can be approved after restart
-- listed/deserialized traces cannot mutate stored state
+- GitHub Pages static export and deployment
 
 ## Transfer from strict simulation agents
 
@@ -243,22 +317,19 @@ The architecture was extracted from a stateful competition agent connected to a 
 | Preserve option and workflow state | Preserve transaction state | Durable run trace |
 | Do not assume hidden information | Do not treat unavailable data as fact | Caller observation + fingerprint |
 | Resource-sensitive decisions | Permissions, cost, rate limits | Policy metadata and checks |
-| Invalid action is unacceptable | Unauthorized or unsupported API call | Candidate filtering |
+| Invalid action is unacceptable | Unauthorized or unsupported API call | Candidate and adapter filtering |
 | Replay and policy comparison | Audit and regression evaluation | Decision events and tests |
 
 Read [`docs/case-study-pokemon.md`](docs/case-study-pokemon.md) for the transfer boundary.
 
 ## Claim boundary
 
-This is a portfolio-grade reference system, not a finished enterprise platform.
+This is a portfolio-grade reference system, not a finished enterprise platform. It demonstrates a durable single-node control plane, provider integration, and operator-configured HTTP tools, but it does **not** claim:
 
-It demonstrates a durable single-node control plane, but it does **not** claim:
-
-- production authentication or tenant isolation
+- production authentication, tenant isolation, or enterprise RBAC
 - PostgreSQL or distributed database operation
 - durable background queues
-- real CRM, email, billing, or RAG connectors
-- a live LLM planner/provider router
+- bundled vendor-specific CRM, email, billing, or RAG connectors
 - load-test evidence or production SLOs
 - multi-region replication or distributed transactions
 
@@ -267,11 +338,11 @@ See [`docs/evidence.md`](docs/evidence.md) for the distinction between public re
 ## Next priorities
 
 1. Authentication, RBAC, and tenant isolation
-2. Async tool executor with timeout and retry policy
-3. OpenAI-compatible planner/provider adapter
-4. CRM, email, RAG, and billing adapters
-5. Append-only audit/event storage
-6. Evaluation fixtures and measured policy-promotion gates
+2. Async execution with retry, backoff, circuit breaking, and durable queues
+3. Vendor-specific CRM, email, billing, and RAG adapter packages
+4. Append-only audit/event storage
+5. Evaluation fixtures and measured policy-promotion gates
+6. Load testing and production SLO evidence
 
 ## Author
 
