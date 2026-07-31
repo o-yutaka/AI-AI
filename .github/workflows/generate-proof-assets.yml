@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - feature/portfolio-proof-complete-20260801
+  pull_request:
+    paths:
+      - "docs/live-demo.html"
+      - "scripts/capture_visual_proof.py"
+      - "web/**"
+      - "pyproject.toml"
+      - ".github/workflows/generate-proof-assets.yml"
   workflow_dispatch:
 
 permissions:
