@@ -4,6 +4,7 @@ from app import create_app
 from control_plane.models import CandidateAction
 from control_plane.providers import PlannedRunRequest, PlannerResult
 from control_plane.runtime import AgentRuntime
+from control_plane.security import REDACTED
 
 
 def payload(*, risk: str = "low", evidence: list[str] | None = None) -> dict:
@@ -70,12 +71,16 @@ class FakePlanner:
         )
 
 
-def test_health() -> None:
+def test_health_and_security_headers() -> None:
     client = TestClient(create_app(AgentRuntime()))
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "version": "0.4.0"}
+    assert response.json() == {"status": "ok", "version": "0.5.0"}
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert "payment=()" in response.headers["permissions-policy"]
 
 
 def test_provider_status_when_unconfigured() -> None:
@@ -122,6 +127,21 @@ def test_create_and_get_run() -> None:
     assert fetched.json()["run_id"] == run_id
 
 
+def test_api_redacts_sensitive_observation_before_response() -> None:
+    client = TestClient(create_app(AgentRuntime()))
+    body = payload()
+    body["observation"] = {
+        "ticket_id": "T-100",
+        "email": "person@example.com",
+    }
+
+    response = client.post("/v1/runs", json=body)
+
+    assert response.status_code == 201
+    assert response.json()["observation"]["email"] == REDACTED
+    assert "person@example.com" not in response.text
+
+
 def test_validation_error_for_duplicate_action_ids() -> None:
     client = TestClient(create_app(AgentRuntime()))
     body = payload()
@@ -149,7 +169,7 @@ def test_decision_endpoint_approves_waiting_run() -> None:
         f"/v1/runs/{run_id}/decision",
         json={
             "decision": "approve",
-            "approver": "ops@example.com",
+            "approver": "portfolio-operator-id",
             "reason": "Policy verified",
         },
     )
@@ -166,7 +186,7 @@ def test_decision_for_completed_run_returns_409() -> None:
         f"/v1/runs/{run_id}/decision",
         json={
             "decision": "approve",
-            "approver": "ops@example.com",
+            "approver": "portfolio-operator-id",
             "reason": "Not applicable",
         },
     )
