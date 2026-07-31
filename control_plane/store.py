@@ -51,9 +51,15 @@ class SQLiteRunRepository:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = RLock()
-        self._connection = sqlite3.connect(self.path, check_same_thread=False)
+        self._connection = sqlite3.connect(
+            self.path,
+            timeout=5.0,
+            check_same_thread=False,
+        )
         self._connection.execute("PRAGMA journal_mode=WAL")
+        self._connection.execute("PRAGMA synchronous=NORMAL")
         self._connection.execute("PRAGMA foreign_keys=ON")
+        self._connection.execute("PRAGMA busy_timeout=5000")
         self._connection.execute(
             """
             CREATE TABLE IF NOT EXISTS runs (
