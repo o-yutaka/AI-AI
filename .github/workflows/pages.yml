@@ -61,12 +61,13 @@ jobs:
       BUILD_RESULT: ${{ needs.build.result }}
       DEPLOY_RESULT: ${{ needs.deploy.result }}
       PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+      MIRROR_URL: https://raw.githack.com/o-yutaka/AI-AI/main/docs/live-demo.html
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Verify the public page
-        id: verify
+      - name: Verify the clean GitHub Pages URL
+        id: verify_pages
         shell: bash
         run: |
           verification="not_run"
@@ -82,10 +83,24 @@ jobs:
           fi
           echo "verification=$verification" >> "$GITHUB_OUTPUT"
           echo "http_status=$http_status" >> "$GITHUB_OUTPUT"
+      - name: Verify the immediate public mirror
+        id: verify_mirror
+        shell: bash
+        run: |
+          response_file="$(mktemp)"
+          http_status="$(curl --location --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors --output "$response_file" --write-out '%{http_code}' "$MIRROR_URL" || true)"
+          verification="failure"
+          if [ "$http_status" = "200" ] && grep --quiet "AI Agent Control Plane" "$response_file"; then
+            verification="success"
+          fi
+          echo "verification=$verification" >> "$GITHUB_OUTPUT"
+          echo "http_status=$http_status" >> "$GITHUB_OUTPUT"
       - name: Write machine-readable deployment evidence when state changes
         env:
-          VERIFICATION_RESULT: ${{ steps.verify.outputs.verification }}
-          HTTP_STATUS: ${{ steps.verify.outputs.http_status }}
+          PAGES_VERIFICATION_RESULT: ${{ steps.verify_pages.outputs.verification }}
+          PAGES_HTTP_STATUS: ${{ steps.verify_pages.outputs.http_status }}
+          MIRROR_VERIFICATION_RESULT: ${{ steps.verify_mirror.outputs.verification }}
+          MIRROR_HTTP_STATUS: ${{ steps.verify_mirror.outputs.http_status }}
           WORKFLOW_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
           COMMIT_SHA: ${{ github.sha }}
         run: |
@@ -101,16 +116,19 @@ jobs:
               reason = "pages_not_enabled_or_not_configured_for_github_actions"
           elif os.environ["DEPLOY_RESULT"] == "failure":
               reason = "pages_deployment_failed"
-          elif os.environ["VERIFICATION_RESULT"] == "failure":
-              reason = "public_http_verification_failed"
+          elif os.environ["PAGES_VERIFICATION_RESULT"] == "failure":
+              reason = "pages_http_verification_failed"
 
           stable = {
-              "build_result": os.environ["BUILD_RESULT"],
-              "deploy_result": os.environ["DEPLOY_RESULT"],
-              "verification_result": os.environ["VERIFICATION_RESULT"],
-              "http_status": os.environ["HTTP_STATUS"] or None,
-              "page_url": os.environ["PAGE_URL"] or None,
-              "reason": reason,
+              "mirror_url": os.environ["MIRROR_URL"],
+              "mirror_verification_result": os.environ["MIRROR_VERIFICATION_RESULT"],
+              "mirror_http_status": os.environ["MIRROR_HTTP_STATUS"] or None,
+              "pages_build_result": os.environ["BUILD_RESULT"],
+              "pages_deploy_result": os.environ["DEPLOY_RESULT"],
+              "pages_verification_result": os.environ["PAGES_VERIFICATION_RESULT"],
+              "pages_http_status": os.environ["PAGES_HTTP_STATUS"] or None,
+              "pages_url": os.environ["PAGE_URL"] or None,
+              "pages_reason": reason,
           }
           previous = {}
           if path.exists():
