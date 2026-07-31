@@ -1,28 +1,26 @@
 name: generate-proof-assets
 
 on:
-  push:
-    branches:
-      - feature/portfolio-proof-complete-20260801
-    paths-ignore:
-      - "requirements.lock.txt"
-      - "requirements.runtime.lock.txt"
-      - "web/package-lock.json"
-      - "docs/assets/proof/**"
   pull_request:
     paths:
+      - "control_plane/**"
       - "docs/live-demo.html"
+      - "docs/assets/proof/visual-proof-manifest.json"
       - "scripts/capture_visual_proof.py"
+      - "tests/**"
       - "web/app/**"
       - "web/package.json"
+      - "web/package-lock.json"
       - "web/next.config.*"
       - "web/tsconfig.json"
       - "pyproject.toml"
+      - "requirements.lock.txt"
+      - "requirements.runtime.lock.txt"
       - ".github/workflows/generate-proof-assets.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: proof-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -37,34 +35,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Generate frontend lockfile
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Verify frontend lock
         working-directory: web
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Generate exact Python dependency locks
+          cache: pip
+          cache-dependency-path: |
+            requirements.lock.txt
+            requirements.runtime.lock.txt
+      - name: Verify runtime lock
         run: |
           python -m venv /tmp/ai-ai-runtime-lock
           /tmp/ai-ai-runtime-lock/bin/python -m pip install --upgrade pip
-          /tmp/ai-ai-runtime-lock/bin/pip install -e .
-          /tmp/ai-ai-runtime-lock/bin/pip freeze --exclude-editable | LC_ALL=C sort > requirements.runtime.lock.txt
-
+          /tmp/ai-ai-runtime-lock/bin/pip install -r requirements.runtime.lock.txt
+          /tmp/ai-ai-runtime-lock/bin/pip install --no-deps .
+          /tmp/ai-ai-runtime-lock/bin/pip check
+      - name: Verify development lock
+        run: |
           python -m venv /tmp/ai-ai-dev-lock
           /tmp/ai-ai-dev-lock/bin/python -m pip install --upgrade pip
-          /tmp/ai-ai-dev-lock/bin/pip install -e ".[dev]"
-          /tmp/ai-ai-dev-lock/bin/pip freeze --exclude-editable | LC_ALL=C sort > requirements.lock.txt
-
-          test -s requirements.runtime.lock.txt
-          test -s requirements.lock.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: generated-lockfiles
-          path: |
-            web/package-lock.json
-            requirements.runtime.lock.txt
-            requirements.lock.txt
-          if-no-files-found: error
+          /tmp/ai-ai-dev-lock/bin/pip install -r requirements.lock.txt
+          /tmp/ai-ai-dev-lock/bin/pip install --no-deps -e .
+          /tmp/ai-ai-dev-lock/bin/pip check
 
   visual-proof:
     runs-on: ubuntu-latest
@@ -91,11 +87,46 @@ jobs:
           done
           cat /tmp/ai-ai-proof-server.log
           exit 1
-      - name: Verify interactions and capture proof
+      - name: Verify interactions and regenerate proof
         run: >-
           python scripts/capture_visual_proof.py
           --url http://127.0.0.1:4173/live-demo.html
-          --output docs/assets/proof
+          --output /tmp/visual-proof
+      - name: Verify generated proof contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          generated = json.loads(Path('/tmp/visual-proof/visual-proof-manifest.json').read_text())
+          committed = json.loads(Path('docs/assets/proof/visual-proof-manifest.json').read_text())
+          expected = {
+              'different_run_ids_same_input': True,
+              'duplicate_execution_count': 1,
+              'blocked_execution_count': 0,
+              'conflict_execution_count': 0,
+              'approved_execution_count': 1,
+          }
+          for key, value in expected.items():
+              assert generated['verification'][key] == value, (key, generated['verification'][key])
+              assert committed['verification'][key] == value, (key, committed['verification'][key])
+
+          generated_assets = {item['file']: item for item in generated['assets']}
+          minimums = {
+              'ai-agent-control-plane-desktop-waiting.jpg': (1440, 1000),
+              'ai-agent-control-plane-desktop-approved.jpg': (1440, 1000),
+              'ai-agent-control-plane-desktop-blocked.jpg': (1440, 1000),
+              'ai-agent-control-plane-desktop-idempotency.jpg': (1440, 1000),
+              'ai-agent-control-plane-mobile-waiting.jpg': (390, 844),
+              'ai-agent-control-plane-proof.gif': (640, 500),
+          }
+          for name, (width, height) in minimums.items():
+              asset = generated_assets[name]
+              assert asset['width'] >= width, (name, asset['width'])
+              assert asset['height'] >= height, (name, asset['height'])
+              assert asset['bytes'] > 10_000, (name, asset['bytes'])
+              assert Path('docs/assets/proof', name).is_file(), name
+          PY
       - name: Stop local proof server
         if: always()
         run: |
@@ -105,34 +136,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: visual-proof-assets
-          path: docs/assets/proof
+          path: /tmp/visual-proof
           if-no-files-found: error
-
-  commit-generated:
-    if: github.event_name == 'push'
-    needs: [lockfiles, visual-proof]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref_name }}
-          fetch-depth: 0
-      - uses: actions/download-artifact@v4
-        with:
-          name: generated-lockfiles
-          path: .
-      - uses: actions/download-artifact@v4
-        with:
-          name: visual-proof-assets
-          path: docs/assets/proof
-      - name: Commit generated evidence
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add requirements.lock.txt requirements.runtime.lock.txt web/package-lock.json docs/assets/proof
-          if git diff --cached --quiet; then
-            exit 0
-          fi
-          git commit -m "Commit generated lockfiles and visual proof [skip ci]"
-          git push origin HEAD:${{ github.ref_name }}
