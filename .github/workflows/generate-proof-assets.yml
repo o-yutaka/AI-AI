@@ -1,0 +1,61 @@
+name: generate-proof-assets
+
+on:
+  push:
+    branches:
+      - feature/portfolio-proof-complete-20260801
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lockfiles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Generate frontend lockfile
+        working-directory: web
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generate Python dependency lock
+        run: |
+          python -m pip install --upgrade pip pip-tools
+          pip-compile --extra dev --resolver backtracking --strip-extras --output-file requirements.lock.txt pyproject.toml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: generated-lockfiles
+          path: |
+            web/package-lock.json
+            requirements.lock.txt
+          if-no-files-found: error
+
+  visual-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install browser proof dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright==1.55.0 pillow==11.3.0
+          python -m playwright install --with-deps chromium
+      - name: Verify interactions and capture proof
+        run: >-
+          python scripts/capture_visual_proof.py
+          --url "file://${GITHUB_WORKSPACE}/docs/live-demo.html"
+          --output docs/assets/proof
+      - uses: actions/upload-artifact@v4
+        with:
+          name: visual-proof-assets
+          path: docs/assets/proof
+          if-no-files-found: error
