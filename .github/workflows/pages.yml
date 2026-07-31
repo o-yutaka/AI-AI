@@ -6,8 +6,10 @@ on:
     paths-ignore:
       - docs/live-status.json
   workflow_dispatch:
+  # Pages enablement is an account/repository setting. Retry once per day instead of
+  # creating a failed workflow run every hour while that setting remains disabled.
   schedule:
-    - cron: "17 * * * *"
+    - cron: "17 3 * * *"
 
 permissions:
   contents: write
@@ -21,6 +23,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,6 +48,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: build
     outputs:
       page_url: ${{ steps.deployment.outputs.page_url }}
@@ -56,6 +60,7 @@ jobs:
   report:
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [build, deploy]
     env:
       BUILD_RESULT: ${{ needs.build.result }}
