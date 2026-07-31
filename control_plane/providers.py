@@ -8,6 +8,7 @@ import httpx
 from pydantic import BaseModel, Field, ValidationError
 
 from .models import ActionContract, CandidateAction
+from .security import redact_text, redact_value
 
 
 class ProviderError(RuntimeError):
@@ -48,12 +49,25 @@ class CandidatePlanner(Protocol):
     def plan(self, request: PlannedRunRequest) -> PlannerResult: ...
 
 
+def _read_bounded_response(response: httpx.Response, maximum: int) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    for chunk in response.iter_bytes():
+        total += len(chunk)
+        if total > maximum:
+            raise ProviderResponseError(
+                "provider response exceeded configured size limit"
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 class OpenAICompatiblePlanner:
     """Generate untrusted action candidates through an OpenAI-compatible endpoint.
 
     Candidate generation and action execution remain separate. The result still passes
-    through the runtime's contract, permission, evidence, ranking, approval, and
-    idempotency gates before any configured tool adapter can run.
+    through the runtime's contract, permission, evidence, sensitive-data, tool-capability,
+    ranking, approval, and idempotency gates before any configured adapter can run.
     """
 
     provider_name = "openai-compatible"
@@ -65,6 +79,7 @@ class OpenAICompatiblePlanner:
         model: str,
         api_key: str | None = None,
         timeout_seconds: float = 30.0,
+        max_response_bytes: int = 524_288,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         normalized = base_url.rstrip("/")
@@ -74,11 +89,14 @@ class OpenAICompatiblePlanner:
             raise ValueError("model must not be empty")
         if timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
+        if not 1_024 <= max_response_bytes <= 5_242_880:
+            raise ValueError("max_response_bytes must be between 1024 and 5242880")
 
         self.base_url = normalized
         self.model = model.strip()
         self._api_key = api_key
         self._timeout_seconds = timeout_seconds
+        self._max_response_bytes = max_response_bytes
         self._transport = transport
 
     @staticmethod
@@ -88,15 +106,17 @@ class OpenAICompatiblePlanner:
             "Return one JSON object with a candidates array only. Each candidate must "
             "contain action_id, name, tool, operation, payload, expected_value, risk, "
             "reversible, evidence, and required_permissions. Use only tools and operations "
-            "listed in the supplied tool catalog. Do not claim execution occurred. "
+            "listed in the supplied tool catalog. Do not include credentials, tokens, "
+            "passwords, email addresses, phone numbers, or postal addresses in payloads. "
+            "Use stable record identifiers instead. Do not claim execution occurred. "
             "High-risk actions need concrete evidence references."
         )
 
     @staticmethod
     def _user_payload(request: PlannedRunRequest) -> str:
         payload = {
-            "goal": request.goal,
-            "observation": request.observation,
+            "goal": redact_text(request.goal),
+            "observation": redact_value(request.observation),
             "contract": request.contract.model_dump(mode="json"),
             "tool_catalog": [tool.model_dump(mode="json") for tool in request.tools],
         }
@@ -155,20 +175,30 @@ class OpenAICompatiblePlanner:
                 timeout=self._timeout_seconds,
                 transport=self._transport,
                 follow_redirects=False,
-            ) as client:
-                response = client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers=headers,
-                    json=body,
-                )
+            ) as client, client.stream(
+                "POST",
+                f"{self.base_url}/chat/completions",
+                headers=headers,
+                json=body,
+            ) as response:
                 response.raise_for_status()
-                response_payload = response.json()
-        except (httpx.HTTPError, ValueError) as exc:
-            raise ProviderError(f"provider request failed: {exc}") from exc
+                content = _read_bounded_response(
+                    response,
+                    self._max_response_bytes,
+                )
+                response_payload = json.loads(
+                    content.decode(response.encoding or "utf-8")
+                )
+        except ProviderResponseError:
+            raise
+        except (httpx.HTTPError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ProviderError(
+                f"provider request failed: {redact_text(str(exc))}"
+            ) from exc
 
-        content = self._message_content(response_payload)
+        message_content = self._message_content(response_payload)
         try:
-            decoded = json.loads(content)
+            decoded = json.loads(message_content)
             candidates = [
                 CandidateAction.model_validate(candidate)
                 for candidate in decoded["candidates"]

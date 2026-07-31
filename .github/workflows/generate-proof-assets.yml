@@ -1,0 +1,140 @@
+name: generate-proof-assets
+
+on:
+  pull_request:
+    paths:
+      - "control_plane/**"
+      - "docs/live-demo.html"
+      - "docs/assets/proof/visual-proof-manifest.json"
+      - "scripts/capture_visual_proof.py"
+      - "tests/**"
+      - "web/app/**"
+      - "web/package.json"
+      - "web/package-lock.json"
+      - "web/next.config.*"
+      - "web/tsconfig.json"
+      - "pyproject.toml"
+      - "requirements.lock.txt"
+      - "requirements.runtime.lock.txt"
+      - ".github/workflows/generate-proof-assets.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: proof-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lockfiles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Verify frontend lock
+        working-directory: web
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.lock.txt
+            requirements.runtime.lock.txt
+      - name: Verify runtime lock
+        run: |
+          python -m venv /tmp/ai-ai-runtime-lock
+          /tmp/ai-ai-runtime-lock/bin/python -m pip install --upgrade pip
+          /tmp/ai-ai-runtime-lock/bin/pip install -r requirements.runtime.lock.txt
+          /tmp/ai-ai-runtime-lock/bin/pip install --no-deps .
+          /tmp/ai-ai-runtime-lock/bin/pip check
+      - name: Verify development lock
+        run: |
+          python -m venv /tmp/ai-ai-dev-lock
+          /tmp/ai-ai-dev-lock/bin/python -m pip install --upgrade pip
+          /tmp/ai-ai-dev-lock/bin/pip install -r requirements.lock.txt
+          /tmp/ai-ai-dev-lock/bin/pip install --no-deps -e .
+          /tmp/ai-ai-dev-lock/bin/pip check
+
+  visual-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install browser proof dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright==1.55.0 pillow==11.3.0
+          python -m playwright install --with-deps chromium
+      - name: Start local proof server
+        run: |
+          python -m http.server 4173 --directory docs > /tmp/ai-ai-proof-server.log 2>&1 &
+          echo $! > /tmp/ai-ai-proof-server.pid
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:4173/live-demo.html > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/ai-ai-proof-server.log
+          exit 1
+      - name: Verify interactions and regenerate proof
+        run: >-
+          python scripts/capture_visual_proof.py
+          --url http://127.0.0.1:4173/live-demo.html
+          --output /tmp/visual-proof
+      - name: Verify generated proof contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          generated = json.loads(Path('/tmp/visual-proof/visual-proof-manifest.json').read_text())
+          committed = json.loads(Path('docs/assets/proof/visual-proof-manifest.json').read_text())
+          expected = {
+              'different_run_ids_same_input': True,
+              'duplicate_execution_count': 1,
+              'blocked_execution_count': 0,
+              'conflict_execution_count': 0,
+              'approved_execution_count': 1,
+          }
+          for key, value in expected.items():
+              assert generated['verification'][key] == value, (key, generated['verification'][key])
+              assert committed['verification'][key] == value, (key, committed['verification'][key])
+
+          generated_assets = {item['file']: item for item in generated['assets']}
+          minimums = {
+              'ai-agent-control-plane-desktop-waiting.jpg': (1440, 1000),
+              'ai-agent-control-plane-desktop-approved.jpg': (1440, 1000),
+              'ai-agent-control-plane-desktop-blocked.jpg': (1440, 1000),
+              'ai-agent-control-plane-desktop-idempotency.jpg': (1440, 1000),
+              'ai-agent-control-plane-mobile-waiting.jpg': (390, 844),
+              'ai-agent-control-plane-proof.gif': (640, 500),
+          }
+          for name, (width, height) in minimums.items():
+              asset = generated_assets[name]
+              assert asset['width'] >= width, (name, asset['width'])
+              assert asset['height'] >= height, (name, asset['height'])
+              assert asset['bytes'] > 10_000, (name, asset['bytes'])
+              assert Path('docs/assets/proof', name).is_file(), name
+          PY
+      - name: Stop local proof server
+        if: always()
+        run: |
+          if [ -f /tmp/ai-ai-proof-server.pid ]; then
+            kill "$(cat /tmp/ai-ai-proof-server.pid)" || true
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: visual-proof-assets
+          path: /tmp/visual-proof
+          if-no-files-found: error

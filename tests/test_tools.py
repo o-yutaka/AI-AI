@@ -4,6 +4,7 @@ import httpx
 import pytest
 
 from control_plane.models import CandidateAction
+from control_plane.security import REDACTED
 from control_plane.tools import (
     HttpJsonToolAdapter,
     HttpOperation,
@@ -13,21 +14,27 @@ from control_plane.tools import (
 )
 
 
-def action(*, operation: str = "reply", tool: str = "support_api") -> CandidateAction:
+def action(
+    *,
+    operation: str = "reply",
+    tool: str = "support_api",
+    payload: dict | None = None,
+) -> CandidateAction:
     return CandidateAction(
         action_id="reply",
         name="Reply to customer",
         tool=tool,
         operation=operation,
-        payload={"ticket_id": "T/100", "message": "Resolved"},
+        payload=payload or {"ticket_id": "T/100", "message": "Resolved"},
         expected_value=0.9,
     )
 
 
-def config() -> HttpToolConfig:
+def config(*, max_response_bytes: int = 262_144) -> HttpToolConfig:
     return HttpToolConfig(
         base_url="https://support.example",
         headers={"Authorization": "Bearer ${SUPPORT_API_TOKEN}"},
+        max_response_bytes=max_response_bytes,
         operations={
             "reply": HttpOperation(
                 method="POST",
@@ -82,8 +89,72 @@ def test_tool_registry_denies_unregistered_tool() -> None:
         executor(action(tool="billing_api"))
 
 
+def test_tool_registry_exposes_exact_capabilities() -> None:
+    adapter = HttpJsonToolAdapter(config(), environment={"SUPPORT_API_TOKEN": "secret"})
+    executor = ToolRegistryExecutor({"support_api": adapter})
+
+    assert executor.capabilities == frozenset({("support_api", "reply")})
+    assert executor.supports(action()) is True
+    assert executor.supports(action(operation="delete_account")) is False
+
+
 def test_http_adapter_requires_referenced_secret() -> None:
     adapter = HttpJsonToolAdapter(config(), environment={})
 
     with pytest.raises(ToolExecutionError, match="SUPPORT_API_TOKEN"):
         adapter.execute(action())
+
+
+def test_http_adapter_rejects_sensitive_payload_values() -> None:
+    adapter = HttpJsonToolAdapter(
+        config(),
+        environment={"SUPPORT_API_TOKEN": "secret"},
+    )
+
+    with pytest.raises(ToolExecutionError, match="sensitive values"):
+        adapter.execute(
+            action(payload={"ticket_id": "T-100", "email": "person@example.com"})
+        )
+
+
+def test_http_adapter_aborts_when_stream_crosses_response_limit() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/octet-stream"},
+            content=b"x" * 2048,
+        )
+
+    adapter = HttpJsonToolAdapter(
+        config(max_response_bytes=1024),
+        environment={"SUPPORT_API_TOKEN": "secret"},
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(ToolExecutionError, match="size limit"):
+        adapter.execute(action())
+
+
+def test_http_adapter_redacts_sensitive_response_fields() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/json"},
+            json={
+                "ticket_id": "T-100",
+                "token": "must-not-leak",
+                "customer": {"email": "person@example.com"},
+            },
+        )
+
+    adapter = HttpJsonToolAdapter(
+        config(),
+        environment={"SUPPORT_API_TOKEN": "secret"},
+        transport=httpx.MockTransport(handler),
+    )
+    result = adapter.execute(action())
+
+    assert result["response"]["token"] == REDACTED
+    assert result["response"]["customer"]["email"] == REDACTED
+    assert "must-not-leak" not in str(result)
+    assert "person@example.com" not in str(result)

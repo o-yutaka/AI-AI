@@ -6,8 +6,6 @@ on:
     paths-ignore:
       - docs/live-status.json
   workflow_dispatch:
-  # Pages enablement is an account/repository setting. Retry once per day instead of
-  # creating a failed workflow run every hour while that setting remains disabled.
   schedule:
     - cron: "17 3 * * *"
 
@@ -29,9 +27,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install frontend dependencies
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install locked frontend dependencies
         working-directory: web
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Build browser-safe interactive demo
         working-directory: web
         env:

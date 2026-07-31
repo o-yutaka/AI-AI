@@ -114,6 +114,8 @@ class DecisionTrace(BaseModel):
     updated_at: datetime = Field(default_factory=utc_now)
     revision: int = 1
     idempotency_key: str | None = None
+    idempotency_replayed: bool = False
+    execution_count: int = Field(default=0, ge=0)
     goal: str
     observation: dict[str, Any]
     observation_fingerprint: str

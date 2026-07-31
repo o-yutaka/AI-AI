@@ -1,6 +1,6 @@
 import os
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from control_plane.errors import (
@@ -19,7 +19,7 @@ from control_plane.runtime import AgentRuntime
 from control_plane.store import SQLiteRunRepository
 from control_plane.tools import tool_executor_from_environment
 
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 
 
 def runtime_from_environment() -> AgentRuntime:
@@ -39,6 +39,9 @@ def planner_from_environment() -> CandidatePlanner | None:
         model=model,
         api_key=os.getenv("OPENAI_COMPATIBLE_API_KEY"),
         timeout_seconds=float(os.getenv("OPENAI_COMPATIBLE_TIMEOUT_SECONDS", "30")),
+        max_response_bytes=int(
+            os.getenv("OPENAI_COMPATIBLE_MAX_RESPONSE_BYTES", "524288")
+        ),
     )
 
 
@@ -68,6 +71,17 @@ def create_app(
         allow_methods=["GET", "POST"],
         allow_headers=["Content-Type"],
     )
+
+    @app.middleware("http")
+    async def security_headers(request: Request, call_next) -> Response:
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=(), payment=()"
+        )
+        return response
 
     @app.get("/health")
     def health() -> dict[str, str]:

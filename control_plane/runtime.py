@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import json
 from collections.abc import Callable
 from threading import RLock
 from typing import Any
@@ -22,6 +20,13 @@ from .models import (
     RunStatus,
     utc_now,
 )
+from .security import (
+    find_sensitive_paths,
+    fingerprint,
+    redact_text,
+    redact_value,
+    sensitive_keys_from_environment,
+)
 from .store import InMemoryRunRepository, RunRepository
 
 Executor = Callable[[CandidateAction], dict[str, Any]]
@@ -40,10 +45,22 @@ class AgentRuntime:
         self,
         executor: Executor | None = None,
         repository: RunRepository | None = None,
+        *,
+        allowed_tool_operations: set[tuple[str, str]] | None = None,
+        sensitive_keys: set[str] | None = None,
     ) -> None:
         self._executor = executor or self._default_executor
         self._repository = repository or InMemoryRunRepository()
         self._lock = RLock()
+        discovered = getattr(self._executor, "capabilities", None)
+        if allowed_tool_operations is None and discovered:
+            allowed_tool_operations = set(discovered)
+        self._allowed_tool_operations = (
+            frozenset(allowed_tool_operations)
+            if allowed_tool_operations is not None
+            else None
+        )
+        self._sensitive_keys = sensitive_keys or sensitive_keys_from_environment()
 
     @staticmethod
     def _default_executor(action: CandidateAction) -> dict[str, Any]:
@@ -57,14 +74,7 @@ class AgentRuntime:
 
     @staticmethod
     def _fingerprint(observation: dict[str, Any]) -> str:
-        canonical = json.dumps(
-            observation,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            default=str,
-        )
-        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        return fingerprint(observation)
 
     @staticmethod
     def _request_fingerprint(request: RunRequest) -> str:
@@ -86,14 +96,7 @@ class AgentRuntime:
             },
             "candidates": candidates,
         }
-        canonical = json.dumps(
-            payload,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            default=str,
-        )
-        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        return fingerprint(payload)
 
     @staticmethod
     def _clone(trace: DecisionTrace) -> DecisionTrace:
@@ -101,6 +104,13 @@ class AgentRuntime:
 
     def _store(self, trace: DecisionTrace) -> None:
         self._repository.save(self._clone(trace))
+
+    def _redacted_candidate(self, candidate: CandidateAction) -> CandidateAction:
+        payload = redact_value(
+            candidate.model_dump(mode="json"),
+            sensitive_keys=self._sensitive_keys,
+        )
+        return CandidateAction.model_validate(payload)
 
     @staticmethod
     def _rank_candidates(candidates: list[CandidateAction]) -> list[CandidateAction]:
@@ -114,8 +124,11 @@ class AgentRuntime:
             ),
         )
 
-    @staticmethod
-    def _candidate_reasons(request: RunRequest, candidate: CandidateAction) -> list[str]:
+    def _candidate_reasons(
+        self,
+        request: RunRequest,
+        candidate: CandidateAction,
+    ) -> list[str]:
         reasons: list[str] = []
         if candidate.action_id not in request.contract.allowed_action_ids:
             reasons.append("not_in_current_contract")
@@ -128,6 +141,22 @@ class AgentRuntime:
 
         if candidate.risk is RiskLevel.HIGH and not candidate.evidence:
             reasons.append("missing_evidence_for_high_risk_action")
+
+        sensitive_paths = find_sensitive_paths(
+            candidate.payload,
+            sensitive_keys=self._sensitive_keys,
+        )
+        if sensitive_paths:
+            reasons.append(f"sensitive_payload_keys:{','.join(sensitive_paths)}")
+
+        if (
+            self._allowed_tool_operations is not None
+            and (candidate.tool, candidate.operation)
+            not in self._allowed_tool_operations
+        ):
+            reasons.append(
+                f"unregistered_tool_operation:{candidate.tool}.{candidate.operation}"
+            )
 
         return reasons
 
@@ -143,7 +172,18 @@ class AgentRuntime:
                         raise IdempotencyConflictError(
                             "idempotency_key was already used for a different request"
                         )
-                    return self._clone(existing)
+                    replayed = self._clone(existing)
+                    replayed.idempotency_replayed = True
+                    replayed.events.append(
+                        AuditEvent(
+                            event_type="idempotency_replay",
+                            details={
+                                "returned_existing_run": True,
+                                "no_second_execution": True,
+                            },
+                        )
+                    )
+                    return replayed
 
             rejected: list[RejectedAction] = []
             eligible: list[CandidateAction] = []
@@ -183,6 +223,32 @@ class AgentRuntime:
                         for candidate in eligible
                     ),
                 ),
+                PolicyCheck(
+                    rule="sensitive_payloads_rejected",
+                    passed=all(
+                        not find_sensitive_paths(
+                            candidate.payload,
+                            sensitive_keys=self._sensitive_keys,
+                        )
+                        for candidate in eligible
+                    ),
+                ),
+                PolicyCheck(
+                    rule="tool_adapter_allow_list",
+                    passed=all(
+                        self._allowed_tool_operations is None
+                        or (candidate.tool, candidate.operation)
+                        in self._allowed_tool_operations
+                        for candidate in eligible
+                    ),
+                    details={
+                        "enforced": self._allowed_tool_operations is not None,
+                        "allowed": sorted(
+                            f"{tool}.{operation}"
+                            for tool, operation in self._allowed_tool_operations or ()
+                        ),
+                    },
+                ),
             ]
 
             events = [
@@ -194,12 +260,18 @@ class AgentRuntime:
 
             trace = DecisionTrace(
                 idempotency_key=request.idempotency_key,
-                goal=request.goal,
-                observation=request.observation,
+                goal=redact_text(request.goal),
+                observation=redact_value(
+                    request.observation,
+                    sensitive_keys=self._sensitive_keys,
+                ),
                 observation_fingerprint=self._fingerprint(request.observation),
                 request_fingerprint=request_fingerprint,
                 contract_version=request.contract.version,
-                candidates=request.candidates,
+                candidates=[
+                    self._redacted_candidate(candidate)
+                    for candidate in request.candidates
+                ],
                 eligible_action_ids=[candidate.action_id for candidate in eligible],
                 rejected_actions=rejected,
                 policy_checks=checks,
@@ -219,7 +291,7 @@ class AgentRuntime:
 
             ranked = self._rank_candidates(eligible)
             selected = ranked[0]
-            trace.selected_action = selected
+            trace.selected_action = self._redacted_candidate(selected)
             for candidate in ranked[1:]:
                 trace.rejected_actions.append(
                     RejectedAction(
@@ -262,13 +334,18 @@ class AgentRuntime:
         if selected is None:
             raise InvalidRunStateError("cannot execute a run without a selected action")
 
+        trace.execution_count += 1
         try:
-            trace.result = self._executor(selected)
+            result = self._executor(selected)
+            trace.result = redact_value(
+                result,
+                sensitive_keys=self._sensitive_keys,
+            )
         except Exception as exc:  # noqa: BLE001 - runtime must preserve external failures
             trace.status = RunStatus.FAILED
             trace.error = ExecutionError(
                 error_type=type(exc).__name__,
-                message=str(exc),
+                message=redact_text(str(exc)),
             )
             trace.events.append(
                 AuditEvent(
@@ -310,10 +387,11 @@ class AgentRuntime:
             if trace.status is not RunStatus.WAITING_APPROVAL:
                 raise InvalidRunStateError("run is not waiting for approval")
 
+            approver = redact_text(request.approver)
             trace.approval = ApprovalRecord(
                 decision=request.decision,
-                approver=request.approver,
-                reason=request.reason,
+                approver=approver,
+                reason=redact_text(request.reason),
             )
             trace.updated_at = utc_now()
             trace.revision += 1
@@ -323,14 +401,14 @@ class AgentRuntime:
                 trace.events.append(
                     AuditEvent(
                         event_type="approval_rejected",
-                        details={"approver": request.approver},
+                        details={"approver": approver},
                     )
                 )
             else:
                 trace.events.append(
                     AuditEvent(
                         event_type="approval_granted",
-                        details={"approver": request.approver},
+                        details={"approver": approver},
                     )
                 )
                 self._execute(trace)

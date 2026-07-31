@@ -6,12 +6,15 @@ import re
 from collections.abc import Mapping
 from string import Formatter
 from typing import Any, Literal, Protocol
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import httpx
 from pydantic import BaseModel, Field, TypeAdapter, field_validator, model_validator
 
 from .models import CandidateAction
+from .security import find_sensitive_paths, is_sensitive_key, redact_value
+
+_ENV_PATTERN = re.compile(r"\$\{([A-Z][A-Z0-9_]*)\}")
 
 
 class ToolExecutionError(RuntimeError):
@@ -46,15 +49,25 @@ class HttpToolConfig(BaseModel):
     allow_insecure_http: bool = False
 
     @model_validator(mode="after")
-    def validate_base_url(self) -> HttpToolConfig:
-        if not self.base_url.startswith(("https://", "http://")):
-            raise ValueError("base_url must use http or https")
-        if self.base_url.startswith("http://") and not self.allow_insecure_http:
+    def validate_boundaries(self) -> HttpToolConfig:
+        parsed = urlsplit(self.base_url)
+        if parsed.scheme not in {"https", "http"} or not parsed.hostname:
+            raise ValueError("base_url must be an absolute http or https URL")
+        if parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ValueError("base_url must not contain credentials, query, or fragment")
+        if parsed.scheme == "http" and not self.allow_insecure_http:
             raise ValueError("plain HTTP requires allow_insecure_http=true")
+        literal_sensitive_headers = sorted(
+            name
+            for name, value in self.headers.items()
+            if is_sensitive_key(name) and not _ENV_PATTERN.search(value)
+        )
+        if literal_sensitive_headers:
+            raise ValueError(
+                "sensitive headers must reference environment variables: "
+                + ", ".join(literal_sensitive_headers)
+            )
         return self
-
-
-_ENV_PATTERN = re.compile(r"\$\{([A-Z][A-Z0-9_]*)\}")
 
 
 def _expand_environment(value: str, environment: Mapping[str, str]) -> str:
@@ -68,11 +81,23 @@ def _expand_environment(value: str, environment: Mapping[str, str]) -> str:
     return _ENV_PATTERN.sub(replace, value)
 
 
+def _read_bounded_response(response: httpx.Response, maximum: int) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    for chunk in response.iter_bytes():
+        total += len(chunk)
+        if total > maximum:
+            raise ToolExecutionError("HTTP tool response exceeded configured size limit")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 class HttpJsonToolAdapter:
     """Execute only preconfigured HTTP operations against one fixed base URL.
 
-    The model may provide payload values, but it cannot choose a host, HTTP method, or
-    arbitrary path. Redirects are disabled and response size is bounded.
+    The model may provide non-sensitive payload values, but it cannot choose a host,
+    HTTP method, arbitrary path, redirect target, or secret. Responses are bounded
+    while streaming, before the complete body is loaded into memory.
     """
 
     def __init__(
@@ -85,6 +110,10 @@ class HttpJsonToolAdapter:
         self._config = config
         self._environment = environment if environment is not None else os.environ
         self._transport = transport
+
+    @property
+    def operations(self) -> frozenset[str]:
+        return frozenset(self._config.operations)
 
     @staticmethod
     def _render_path(template: str, payload: Mapping[str, Any]) -> str:
@@ -113,6 +142,13 @@ class HttpJsonToolAdapter:
                 f"operation is not configured for tool {action.tool}: {action.operation}"
             )
 
+        sensitive_paths = find_sensitive_paths(action.payload)
+        if sensitive_paths:
+            raise ToolExecutionError(
+                "sensitive values must be referenced indirectly, not sent in action payload: "
+                + ", ".join(sensitive_paths)
+            )
+
         path = self._render_path(operation.path, action.payload)
         url = f"{self._config.base_url.rstrip('/')}{path}"
         headers = {
@@ -130,37 +166,40 @@ class HttpJsonToolAdapter:
                 timeout=self._config.timeout_seconds,
                 transport=self._transport,
                 follow_redirects=False,
-            ) as client:
-                response = client.request(
-                    operation.method,
-                    url,
-                    headers=headers,
-                    **request_kwargs,
-                )
+            ) as client, client.stream(
+                operation.method,
+                url,
+                headers=headers,
+                **request_kwargs,
+            ) as response:
                 response.raise_for_status()
+                content_type = response.headers.get("content-type", "")
+                content = _read_bounded_response(
+                    response,
+                    self._config.max_response_bytes,
+                )
+                status_code = response.status_code
+                encoding = response.encoding or "utf-8"
+        except ToolExecutionError:
+            raise
         except httpx.HTTPError as exc:
             raise ToolExecutionError(f"HTTP tool request failed: {exc}") from exc
 
-        content = response.content
-        if len(content) > self._config.max_response_bytes:
-            raise ToolExecutionError("HTTP tool response exceeded configured size limit")
-
-        content_type = response.headers.get("content-type", "")
         if "json" in content_type:
             try:
-                parsed: Any = response.json()
-            except ValueError as exc:
+                parsed: Any = json.loads(content.decode(encoding))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
                 raise ToolExecutionError("HTTP tool returned malformed JSON") from exc
         else:
-            parsed = response.text
+            parsed = content.decode(encoding, errors="replace")
 
         return {
             "executed": True,
             "adapter": "http_json",
             "tool": action.tool,
             "operation": action.operation,
-            "status_code": response.status_code,
-            "response": parsed,
+            "status_code": status_code,
+            "response": redact_value(parsed),
         }
 
 
@@ -172,6 +211,17 @@ class ToolRegistryExecutor:
             raise ValueError("at least one tool adapter is required")
         self._adapters = dict(adapters)
 
+    @property
+    def capabilities(self) -> frozenset[tuple[str, str]]:
+        declared: set[tuple[str, str]] = set()
+        for tool_name, adapter in self._adapters.items():
+            operations = getattr(adapter, "operations", frozenset())
+            declared.update((tool_name, operation) for operation in operations)
+        return frozenset(declared)
+
+    def supports(self, action: CandidateAction) -> bool:
+        return (action.tool, action.operation) in self.capabilities
+
     def __call__(self, action: CandidateAction) -> dict[str, Any]:
         adapter = self._adapters.get(action.tool)
         if adapter is None:
@@ -180,19 +230,7 @@ class ToolRegistryExecutor:
 
 
 def tool_executor_from_environment() -> ToolRegistryExecutor | None:
-    """Build HTTP adapters from TOOL_ADAPTERS_JSON when explicitly configured.
-
-    Example shape:
-    {
-      "support_api": {
-        "base_url": "https://api.example.com",
-        "headers": {"Authorization": "Bearer ${SUPPORT_API_TOKEN}"},
-        "operations": {
-          "reply": {"method": "POST", "path": "/tickets/{ticket_id}/reply"}
-        }
-      }
-    }
-    """
+    """Build HTTP adapters from TOOL_ADAPTERS_JSON when explicitly configured."""
 
     raw = os.getenv("TOOL_ADAPTERS_JSON")
     if not raw:
@@ -204,8 +242,5 @@ def tool_executor_from_environment() -> ToolRegistryExecutor | None:
         raise RuntimeError(f"invalid TOOL_ADAPTERS_JSON: {exc}") from exc
 
     return ToolRegistryExecutor(
-        {
-            name: HttpJsonToolAdapter(config)
-            for name, config in configs.items()
-        }
+        {name: HttpJsonToolAdapter(config) for name, config in configs.items()}
     )
