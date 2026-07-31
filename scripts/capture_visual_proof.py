@@ -18,13 +18,20 @@ def click_and_wait(page: Page, selector: str, status: str) -> None:
     page.locator("#statusText").wait_for(state="visible")
     page.wait_for_function(
         "expected => document.querySelector('#statusText')?.textContent?.trim() === expected",
-        status,
+        arg=status,
+    )
+
+
+def wait_for_status(page: Page, status: str) -> None:
+    page.wait_for_function(
+        "expected => document.querySelector('#statusText')?.textContent?.trim() === expected",
+        arg=status,
     )
 
 
 def verify_demo(page: Page, base_url: str) -> dict[str, Any]:
     page.goto(base_url, wait_until="networkidle")
-    click_and_wait(page, "#lowRisk", "COMPLETED")
+    click_and_wait(page, "#lowRisk", "completed")
     first_identity = read_json(page, "#identity")
     first_run_id = first_identity["run_id"]
     first_fingerprint = first_identity["request_fingerprint"]
@@ -32,19 +39,19 @@ def verify_demo(page: Page, base_url: str) -> dict[str, Any]:
     assert first_identity["canonical_input_excludes_run_id"] is True
 
     page.locator("#reset").click()
-    click_and_wait(page, "#lowRisk", "COMPLETED")
+    click_and_wait(page, "#lowRisk", "completed")
     second_identity = read_json(page, "#identity")
     assert second_identity["run_id"] != first_run_id
     assert second_identity["request_fingerprint"] == first_fingerprint
 
-    click_and_wait(page, "#replaySame", "COMPLETED")
+    click_and_wait(page, "#replaySame", "completed")
     replay_identity = read_json(page, "#identity")
     assert replay_identity["run_id"] == second_identity["run_id"]
     assert replay_identity["execution_count"] == 1
     assert replay_identity["idempotency_replayed"] is True
     assert page.locator("#metricReplay").inner_text() == "REUSED"
 
-    click_and_wait(page, "#blockedRisk", "BLOCKED")
+    click_and_wait(page, "#blockedRisk", "blocked")
     blocked_identity = read_json(page, "#identity")
     blocked_text = page.locator("#rejectedActions").inner_text()
     assert blocked_identity["execution_count"] == 0
@@ -56,19 +63,17 @@ def verify_demo(page: Page, base_url: str) -> dict[str, Any]:
     ):
         assert reason in blocked_text
 
-    click_and_wait(page, "#replayConflict", "BLOCKED")
+    click_and_wait(page, "#replayConflict", "blocked")
     conflict = read_json(page, "#result")
     assert conflict["error_type"] == "IdempotencyConflictError"
     conflict_identity = read_json(page, "#identity")
     assert conflict_identity["execution_count"] == 0
 
-    click_and_wait(page, "#highRisk", "WAITING APPROVAL")
+    click_and_wait(page, "#highRisk", "waiting approval")
     waiting_identity = read_json(page, "#identity")
     assert waiting_identity["execution_count"] == 0
     page.locator("#approve").click()
-    page.wait_for_function(
-        "() => document.querySelector('#statusText')?.textContent?.trim() === 'COMPLETED'"
-    )
+    wait_for_status(page, "completed")
     approved_identity = read_json(page, "#identity")
     assert approved_identity["execution_count"] == 1
 
@@ -87,28 +92,26 @@ def capture(page: Page, base_url: str, output: Path) -> list[Path]:
     generated: list[Path] = []
 
     page.goto(base_url, wait_until="networkidle")
-    click_and_wait(page, "#highRisk", "WAITING APPROVAL")
+    click_and_wait(page, "#highRisk", "waiting approval")
     waiting = output / "ai-agent-control-plane-desktop-waiting.png"
     page.screenshot(path=str(waiting), full_page=True)
     generated.append(waiting)
 
     page.locator("#approve").click()
-    page.wait_for_function(
-        "() => document.querySelector('#statusText')?.textContent?.trim() === 'COMPLETED'"
-    )
+    wait_for_status(page, "completed")
     approved = output / "ai-agent-control-plane-desktop-approved.png"
     page.screenshot(path=str(approved), full_page=True)
     generated.append(approved)
 
     page.locator("#reset").click()
-    click_and_wait(page, "#blockedRisk", "BLOCKED")
+    click_and_wait(page, "#blockedRisk", "blocked")
     blocked = output / "ai-agent-control-plane-desktop-blocked.png"
     page.screenshot(path=str(blocked), full_page=True)
     generated.append(blocked)
 
     page.locator("#reset").click()
-    click_and_wait(page, "#lowRisk", "COMPLETED")
-    click_and_wait(page, "#replaySame", "COMPLETED")
+    click_and_wait(page, "#lowRisk", "completed")
+    click_and_wait(page, "#replaySame", "completed")
     replay = output / "ai-agent-control-plane-desktop-idempotency.png"
     page.screenshot(path=str(replay), full_page=True)
     generated.append(replay)
@@ -117,10 +120,13 @@ def capture(page: Page, base_url: str, output: Path) -> list[Path]:
 
 
 def capture_mobile(browser: Any, base_url: str, output: Path) -> Path:
-    context = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=1)
+    context = browser.new_context(
+        viewport={"width": 390, "height": 844},
+        device_scale_factor=1,
+    )
     page = context.new_page()
     page.goto(base_url, wait_until="networkidle")
-    click_and_wait(page, "#highRisk", "WAITING APPROVAL")
+    click_and_wait(page, "#highRisk", "waiting approval")
     path = output / "ai-agent-control-plane-mobile-waiting.png"
     page.screenshot(path=str(path), full_page=True)
     context.close()
