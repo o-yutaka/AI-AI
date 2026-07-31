@@ -1,15 +1,19 @@
 # AI Agent Control Plane
 
 [![CI](https://github.com/o-yutaka/AI-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/o-yutaka/AI-AI/actions/workflows/ci.yml)
-[![Live demo](https://img.shields.io/badge/live-demo-b9ff66?style=flat&labelColor=10150a)](https://o-yutaka.github.io/AI-AI/)
+[![Live demo](https://img.shields.io/badge/live-demo-b9ff66?style=flat&labelColor=10150a)](https://raw.githack.com/o-yutaka/AI-AI/main/docs/live-demo.html)
 
 A working full-stack reference system for **contract-aware, auditable, human-approved AI agents**.
 
-**Live interactive demo:** https://o-yutaka.github.io/AI-AI/
+**Live interactive demo:** https://raw.githack.com/o-yutaka/AI-AI/main/docs/live-demo.html
+
+**Clean GitHub Pages URL prepared:** https://o-yutaka.github.io/AI-AI/
+
+**Deployment evidence:** [`docs/live-status.json`](docs/live-status.json)
 
 The public browser demo requires no API key and performs no external side effect. It reproduces candidate generation, contract checks, deterministic selection, approval gating, rejection reasons, execution state, and the audit timeline. The backend supports an OpenAI-compatible planner and allow-listed HTTP tool adapters for real integrations.
 
-[![AI Agent Control Plane approval screen](docs/assets/ai-agent-control-plane-live.jpg)](https://o-yutaka.github.io/AI-AI/)
+[![AI Agent Control Plane approval screen](docs/assets/ai-agent-control-plane-live.jpg)](https://raw.githack.com/o-yutaka/AI-AI/main/docs/live-demo.html)
 
 ## What this proves
 
@@ -28,8 +32,8 @@ The public browser demo requires no API key and performs no external side effect
 | Failure handling | Provider and executor failures recorded as structured errors |
 | Restart safety | Pluggable repository with durable SQLite implementation |
 | Full-stack operations | Next.js dashboard for run, review, approval, and trace inspection |
-| Public delivery | Static interactive GitHub Pages demo plus Docker Compose |
-| Verification | Python 3.11/3.12, Ruff, Next.js build, and two Docker builds in CI |
+| Public delivery | Zero-dependency interactive mirror, GitHub Pages workflow, and Docker Compose |
+| Verification | Python 3.11/3.12, Ruff, static export, and two Docker builds in CI |
 
 ## Try the public flow
 
@@ -39,7 +43,7 @@ The public browser demo requires no API key and performs no external side effect
 4. Verify that the high-impact action has not executed.
 5. Approve or reject it and inspect the revised trace and audit events.
 
-The Pages deployment intentionally uses a browser-local executor. This makes the portfolio safe to operate publicly while preserving the same visible decision and approval lifecycle.
+The public mirror intentionally uses a browser-local executor and a restrictive Content Security Policy with network connections disabled. This keeps the portfolio safe to operate publicly while preserving the same visible decision and approval lifecycle. The clean GitHub Pages deployment is also prepared and automatically retried until repository-level Pages enablement is complete.
 
 ## Run the complete stack
 
@@ -281,6 +285,8 @@ The default API URL is `http://localhost:8000`. Override it at build time with `
 ├── docs/
 │   ├── adr/
 │   ├── assets/
+│   ├── live-demo.html
+│   ├── live-status.json
 │   ├── case-study-pokemon.md
 │   └── evidence.md
 ├── .github/workflows/
@@ -305,7 +311,8 @@ GitHub Actions verifies:
 - Next.js production build on Node.js 22
 - Backend Docker image build
 - Frontend Docker image build
-- GitHub Pages static export and deployment
+- GitHub Pages static export
+- deployment result and public HTTP verification recorded in `docs/live-status.json`
 
 ## Transfer from strict simulation agents
 
