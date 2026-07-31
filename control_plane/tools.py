@@ -157,20 +157,20 @@ class HttpJsonToolAdapter:
                 timeout=self._config.timeout_seconds,
                 transport=self._transport,
                 follow_redirects=False,
-            ) as client:
-                with client.stream(
-                    operation.method,
-                    url,
-                    headers=headers,
-                    **request_kwargs,
-                ) as response:
-                    response.raise_for_status()
-                    content_type = response.headers.get("content-type", "")
-                    content = _read_bounded_response(
-                        response,
-                        self._config.max_response_bytes,
-                    )
-                    status_code = response.status_code
+            ) as client, client.stream(
+                operation.method,
+                url,
+                headers=headers,
+                **request_kwargs,
+            ) as response:
+                response.raise_for_status()
+                content_type = response.headers.get("content-type", "")
+                content = _read_bounded_response(
+                    response,
+                    self._config.max_response_bytes,
+                )
+                status_code = response.status_code
+                encoding = response.encoding or "utf-8"
         except ToolExecutionError:
             raise
         except httpx.HTTPError as exc:
@@ -178,11 +178,11 @@ class HttpJsonToolAdapter:
 
         if "json" in content_type:
             try:
-                parsed: Any = json.loads(content.decode(response.encoding or "utf-8"))
+                parsed: Any = json.loads(content.decode(encoding))
             except (UnicodeDecodeError, json.JSONDecodeError) as exc:
                 raise ToolExecutionError("HTTP tool returned malformed JSON") from exc
         else:
-            parsed = content.decode(response.encoding or "utf-8", errors="replace")
+            parsed = content.decode(encoding, errors="replace")
 
         return {
             "executed": True,
