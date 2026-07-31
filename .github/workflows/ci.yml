@@ -57,8 +57,53 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t ai-agent-control-plane-api:ci .
-      - run: docker build -t ai-agent-control-plane-web:ci ./web
+      - name: Build locked images
+        run: |
+          docker build -t ai-agent-control-plane-api:ci .
+          docker build -t ai-agent-control-plane-web:ci ./web
+      - name: Compose runtime smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          cleanup() {
+            status=$?
+            if [ "$status" -ne 0 ]; then
+              docker compose ps || true
+              docker compose logs --no-color || true
+            fi
+            docker compose down --volumes --remove-orphans || true
+            exit "$status"
+          }
+          trap cleanup EXIT
+
+          docker compose up --build --detach
+
+          api_ok=false
+          web_ok=false
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8000/health > /tmp/api-health.json; then
+              api_ok=true
+            fi
+            if curl --fail --silent http://127.0.0.1:3000/ > /tmp/dashboard.html; then
+              web_ok=true
+            fi
+            if [ "$api_ok" = true ] && [ "$web_ok" = true ]; then
+              break
+            fi
+            sleep 2
+          done
+
+          test "$api_ok" = true
+          test "$web_ok" = true
+          grep --quiet '"version":"0.5.0"' /tmp/api-health.json
+          grep --quiet "AI Agent Control Plane" /tmp/dashboard.html
+
+          for service in api web; do
+            container_id="$(docker compose ps --quiet "$service")"
+            test -n "$container_id"
+            test "$(docker inspect --format '{{.State.Running}}' "$container_id")" = "true"
+            test "$(docker inspect --format '{{.State.Health.Status}}' "$container_id")" = "healthy"
+          done
