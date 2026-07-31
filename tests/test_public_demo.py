@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 DEMO = Path(__file__).resolve().parents[1] / "docs" / "live-demo.html"
 
 
