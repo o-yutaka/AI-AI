@@ -8,7 +8,7 @@ import httpx
 from pydantic import BaseModel, Field, ValidationError
 
 from .models import ActionContract, CandidateAction
-from .security import redact_text
+from .security import redact_text, redact_value
 
 
 class ProviderError(RuntimeError):
@@ -115,8 +115,8 @@ class OpenAICompatiblePlanner:
     @staticmethod
     def _user_payload(request: PlannedRunRequest) -> str:
         payload = {
-            "goal": request.goal,
-            "observation": request.observation,
+            "goal": redact_text(request.goal),
+            "observation": redact_value(request.observation),
             "contract": request.contract.model_dump(mode="json"),
             "tool_catalog": [tool.model_dump(mode="json") for tool in request.tools],
         }
