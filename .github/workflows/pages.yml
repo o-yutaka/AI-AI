@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -68,7 +68,7 @@ jobs:
       PAGE_URL: ${{ needs.deploy.outputs.page_url }}
       MIRROR_URL: https://raw.githack.com/o-yutaka/AI-AI/main/docs/live-demo.html
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
       - name: Verify the clean GitHub Pages URL
