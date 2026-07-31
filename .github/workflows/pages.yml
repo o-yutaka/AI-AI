@@ -3,10 +3,12 @@ name: deploy-pages
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - docs/live-status.json
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -42,7 +44,76 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  report:
+    if: always()
+    runs-on: ubuntu-latest
+    needs: [build, deploy]
+    env:
+      BUILD_RESULT: ${{ needs.build.result }}
+      DEPLOY_RESULT: ${{ needs.deploy.result }}
+      PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Verify the public page
+        id: verify
+        shell: bash
+        run: |
+          verification="not_run"
+          http_status=""
+          if [ "$DEPLOY_RESULT" = "success" ] && [ -n "$PAGE_URL" ]; then
+            response_file="$(mktemp)"
+            http_status="$(curl --location --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors --output "$response_file" --write-out '%{http_code}' "$PAGE_URL" || true)"
+            if [ "$http_status" = "200" ] && grep --quiet "AI Agent Control Plane" "$response_file"; then
+              verification="success"
+            else
+              verification="failure"
+            fi
+          fi
+          echo "verification=$verification" >> "$GITHUB_OUTPUT"
+          echo "http_status=$http_status" >> "$GITHUB_OUTPUT"
+      - name: Write machine-readable deployment evidence
+        env:
+          VERIFICATION_RESULT: ${{ steps.verify.outputs.verification }}
+          HTTP_STATUS: ${{ steps.verify.outputs.http_status }}
+          WORKFLOW_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          payload = {
+              "checked_at": datetime.now(timezone.utc).isoformat(),
+              "commit_sha": os.environ["COMMIT_SHA"],
+              "build_result": os.environ["BUILD_RESULT"],
+              "deploy_result": os.environ["DEPLOY_RESULT"],
+              "verification_result": os.environ["VERIFICATION_RESULT"],
+              "http_status": os.environ["HTTP_STATUS"] or None,
+              "page_url": os.environ["PAGE_URL"] or None,
+              "workflow_run_url": os.environ["WORKFLOW_RUN_URL"],
+          }
+          Path("docs").mkdir(exist_ok=True)
+          Path("docs/live-status.json").write_text(
+              json.dumps(payload, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
+      - name: Commit deployment evidence
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/live-status.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Record live deployment verification [skip ci]"
+            git push origin HEAD:main
+          fi
