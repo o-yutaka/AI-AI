@@ -14,6 +14,7 @@ from control_plane.models import (
     RunStatus,
 )
 from control_plane.runtime import AgentRuntime
+from control_plane.security import REDACTED
 
 
 def candidate(
@@ -162,8 +163,9 @@ def test_high_risk_action_requires_named_approval() -> None:
     )
     assert decided.status is RunStatus.COMPLETED
     assert decided.approval is not None
-    assert decided.approval.approver == "ops@example.com"
+    assert decided.approval.approver == REDACTED
     assert decided.result["action_id"] == "refund"
+    assert "ops@example.com" not in decided.model_dump_json()
 
 
 def test_rejected_approval_never_executes() -> None:
@@ -306,7 +308,7 @@ def test_second_decision_is_rejected() -> None:
     )
     decision = ApprovalRequest(
         decision=ApprovalDecision.REJECT,
-        approver="ops@example.com",
+        approver="operator-id",
         reason="Rejected",
     )
     runtime.decide(trace.run_id, decision)
