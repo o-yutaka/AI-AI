@@ -33,6 +33,11 @@ _BEARER_PATTERN = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+")
 _ASSIGNMENT_PATTERN = re.compile(
     r"(?i)\b(authorization|cookie|password|secret|token|api[_-]?key)\b\s*[:=]\s*([^\s,;]+)"
 )
+_EMAIL_PATTERN = re.compile(
+    r"(?<![\w.+-])[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}(?![\w.-])",
+    re.IGNORECASE,
+)
+_PHONE_PATTERN = re.compile(r"(?<!\w)(?:\+?\d[\d ()-]{7,}\d)(?!\w)")
 
 
 def _normalize_key(value: str) -> str:
@@ -56,6 +61,20 @@ def is_sensitive_key(key: str, sensitive_keys: set[str] | None = None) -> bool:
         for candidate in keys
         if len(candidate) >= 5
     )
+
+
+def redact_text(text: str) -> str:
+    redacted = _BEARER_PATTERN.sub("Bearer [REDACTED]", text)
+    redacted = _ASSIGNMENT_PATTERN.sub(
+        lambda match: f"{match.group(1)}=[REDACTED]",
+        redacted,
+    )
+    redacted = _EMAIL_PATTERN.sub(REDACTED, redacted)
+    redacted = _PHONE_PATTERN.sub(REDACTED, redacted)
+    for name, value in os.environ.items():
+        if value and len(value) >= 6 and is_sensitive_key(name):
+            redacted = redacted.replace(value, REDACTED)
+    return redacted
 
 
 def find_sensitive_paths(
@@ -85,6 +104,8 @@ def find_sensitive_paths(
                     prefix=f"{prefix}[{index}]",
                 )
             )
+    elif isinstance(value, str) and redact_text(value) != value:
+        found.append(prefix)
     return sorted(set(found))
 
 
@@ -105,16 +126,9 @@ def redact_value(
         }
     if isinstance(value, (list, tuple, set)):
         return [redact_value(child, sensitive_keys=keys) for child in value]
+    if isinstance(value, str):
+        return redact_text(value)
     return value
-
-
-def redact_text(text: str) -> str:
-    redacted = _BEARER_PATTERN.sub("Bearer [REDACTED]", text)
-    redacted = _ASSIGNMENT_PATTERN.sub(lambda match: f"{match.group(1)}=[REDACTED]", redacted)
-    for name, value in os.environ.items():
-        if value and len(value) >= 6 and is_sensitive_key(name):
-            redacted = redacted.replace(value, REDACTED)
-    return redacted
 
 
 def canonical_json(value: Any) -> str:
