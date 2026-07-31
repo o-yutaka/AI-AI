@@ -7,10 +7,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN useradd --create-home --uid 10001 appuser
 WORKDIR /app
 
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md requirements.runtime.lock.txt ./
 COPY control_plane ./control_plane
 COPY app.py ./
-RUN pip install .
+RUN pip install -r requirements.runtime.lock.txt \
+    && pip install --no-deps .
 
 USER appuser
 EXPOSE 8000
