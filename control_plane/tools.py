@@ -12,7 +12,9 @@ import httpx
 from pydantic import BaseModel, Field, TypeAdapter, field_validator, model_validator
 
 from .models import CandidateAction
-from .security import find_sensitive_paths, redact_value
+from .security import find_sensitive_paths, is_sensitive_key, redact_value
+
+_ENV_PATTERN = re.compile(r"\$\{([A-Z][A-Z0-9_]*)\}")
 
 
 class ToolExecutionError(RuntimeError):
@@ -47,7 +49,7 @@ class HttpToolConfig(BaseModel):
     allow_insecure_http: bool = False
 
     @model_validator(mode="after")
-    def validate_base_url(self) -> HttpToolConfig:
+    def validate_boundaries(self) -> HttpToolConfig:
         parsed = urlsplit(self.base_url)
         if parsed.scheme not in {"https", "http"} or not parsed.hostname:
             raise ValueError("base_url must be an absolute http or https URL")
@@ -55,10 +57,17 @@ class HttpToolConfig(BaseModel):
             raise ValueError("base_url must not contain credentials, query, or fragment")
         if parsed.scheme == "http" and not self.allow_insecure_http:
             raise ValueError("plain HTTP requires allow_insecure_http=true")
+        literal_sensitive_headers = sorted(
+            name
+            for name, value in self.headers.items()
+            if is_sensitive_key(name) and not _ENV_PATTERN.search(value)
+        )
+        if literal_sensitive_headers:
+            raise ValueError(
+                "sensitive headers must reference environment variables: "
+                + ", ".join(literal_sensitive_headers)
+            )
         return self
-
-
-_ENV_PATTERN = re.compile(r"\$\{([A-Z][A-Z0-9_]*)\}")
 
 
 def _expand_environment(value: str, environment: Mapping[str, str]) -> str:
