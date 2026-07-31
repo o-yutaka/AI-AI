@@ -1,161 +1,170 @@
 # Portfolio audit — 2026-08-01
 
-This audit reviews the repository as a hiring portfolio, not only as a codebase. Findings are separated into verified strengths, current blockers, and promotion gates.
+This audit reviews the repository as a hiring portfolio, not only as a codebase. Code-side findings are closed only when source, tests, generated evidence, and claim boundaries agree.
 
-## Verified strengths
-
-- The immediate public mirror is independently checked by GitHub Actions and currently records HTTP 200.
-- The browser demo is self-contained, responsive, and prevents external network calls through CSP.
-- The backend separates untrusted provider output from runtime authorization and execution.
-- Tool adapters use exact tool and operation registration, fixed operator-configured hosts, disabled redirects, timeouts, and structured failures.
-- High-impact actions pause before execution and require a named approval or rejection.
-- SQLite persistence preserves runs, approvals, and idempotency records across process restarts.
-
-## P0 — portfolio truth and public proof
-
-### 1. Enable repository-level GitHub Pages
-
-Current state: code and workflow are ready, but repository-level Pages is not enabled. The clean URL must not be described as live until `docs/live-status.json` records:
-
-```json
-{
-  "pages_build_result": "success",
-  "pages_deploy_result": "success",
-  "pages_verification_result": "success",
-  "pages_http_status": "200"
-}
-```
-
-### 2. Replace the low-resolution screenshot
-
-The current JPEG is 424 × 383 pixels. It proves that a UI exists but is too small for a reviewer to read policy checks, rejection reasons, and trace identity.
-
-Promotion gate:
-
-- desktop screenshot at 1440 × 1000 or larger
-- mobile screenshot at 390 × 844 or larger
-- approval-waiting state visible
-- one completed or rejected state visible
-- text readable without browser zoom
-
-### 3. Make public-demo fingerprints deterministic
-
-The static HTML and Next.js demo currently derive fingerprints from the random run ID. Re-running the same input therefore creates a different fingerprint, which conflicts with the repository's deterministic-fingerprint claim.
-
-Promotion gate:
-
-- fingerprint canonical input, not run identity
-- same input produces the same observation and request fingerprints
-- changed input produces a different fingerprint
-- regression tests cover both conditions
-
-### 4. Label simulated and real execution surfaces explicitly
-
-The public demo simulates provider candidates and execution locally. The repository contains real OpenAI-compatible and HTTP adapter implementations, but the public page must not visually imply that the browser demo contacted those systems.
-
-Required top-of-page wording:
+## Final code-side verdict
 
 ```text
-Public simulation: real contract, policy, approval, and trace lifecycle; simulated provider and executor; no external network calls.
+CODE_SIDE_PORTFOLIO_GATES: PASS
+ACCOUNT_LEVEL_GITHUB_GATES: HOLD
 ```
 
-## P1 — missing proof scenarios
+Machine-readable browser proof: [`assets/proof/visual-proof-manifest.json`](assets/proof/visual-proof-manifest.json).
 
-### 5. Demonstrate a blocked action
+## Closed P0 findings
 
-The current public demo shows successful execution and approval/rejection, but not the most important safety property: refusing an invalid action.
+### Readable visual evidence — PASS
 
-Add at least one scenario for:
+Committed proof assets now include:
 
-- action ID outside the current contract
+- desktop waiting approval: 1440 × 1895
+- desktop approved: 1440 × 1979
+- desktop blocked: 1440 × 2047
+- desktop idempotency replay: 1440 × 1937
+- mobile waiting approval: 390 × 3841
+- compact proof GIF: 640 × 600
+
+The images are generated from the operational public demo by Chromium, not manually composed screenshots.
+
+### Deterministic browser fingerprints — PASS
+
+The browser implementation hashes canonical input with SHA-256. Run identity is excluded.
+
+The proof workflow creates two different run IDs from the same request and asserts the same request fingerprint. Python tests separately verify canonical key ordering and changed-input sensitivity.
+
+### Simulation boundary — PASS
+
+The public page displays `PUBLIC SIMULATION` and an above-the-fold “What is real here?” panel.
+
+The page explicitly states:
+
+- policy, approval, blocking, idempotency, fingerprint, and trace lifecycle execute in-browser
+- provider generation is simulated
+- tool execution is simulated
+- Content Security Policy disables external network calls
+
+The repository documents the separate real HTTP provider and adapter implementations without claiming the browser contacted them.
+
+## Closed P1 proof findings
+
+### Blocked-action proof — PASS
+
+The public demo and backend tests cover:
+
+- action outside the current contract
 - missing permission
 - high-risk action without evidence
 - unregistered tool or operation
+- sensitive values in action payloads
 
-The expected result is `blocked`, no executor event, and an exact rejection reason.
+Expected behavior is exact rejection reasons, status `blocked`, and execution count `0`.
 
-### 6. Demonstrate idempotency visibly
+### Idempotency proof — PASS
 
-Idempotency exists in the backend but is not visible in the public review path. Add a replay button using a stable idempotency key and show:
+The public demo and backend expose:
 
-- duplicate request returns the existing run
-- conflicting request with the same key is rejected
-- no second execution event is created
+- stable idempotency key
+- request fingerprint
+- replay of the same request returning the existing run
+- `idempotency_replayed=true`
+- execution count remaining `1`
+- conflicting request rejection
+- conflict execution count `0`
 
-### 7. Add a short GIF or two-state image sequence
+### Approval-transition proof — PASS
 
-A static screenshot does not demonstrate the critical transition:
+The Chromium workflow verifies:
 
 ```text
-waiting_approval → approved/rejected → execution/no execution → revised audit trace
+waiting approval, execution count 0
+→ approve
+→ completed, execution count 1
 ```
 
-Keep it under 15 seconds and show no secrets or external customer data.
+The GIF and desktop images preserve the review sequence.
 
-## P1 — implementation hardening
+## Closed P1 implementation findings
 
-### 8. Enforce response limits while streaming
+### Streaming response limits — PASS
 
-`HttpJsonToolAdapter` currently loads `response.content` before checking `max_response_bytes`. This is post-download validation, not a network or memory bound.
+Provider and HTTP tool responses are consumed incrementally. Reading stops as soon as the configured byte limit is crossed. Tests cover oversized responses.
 
-Promotion gate:
+### Sensitive-data boundary — PASS within stated scope
 
-- stream response chunks
-- abort immediately after the configured threshold
-- add tests for a response that crosses the threshold incrementally
-- update README wording only after the streaming gate passes
+Implemented controls:
 
-Apply the same bounded-read principle to provider responses.
-
-### 9. Add payload and result redaction
-
-Real support and billing integrations can place PII, credentials, and tokens in observations, payloads, errors, or tool responses. Add a redaction boundary before persistence, API responses, and logs.
-
-Minimum gate:
-
-- configured sensitive-key list
-- Authorization, cookie, token, secret, password, and API-key defaults
+- default and operator-configured sensitive keys
 - nested mapping/list redaction
-- tests proving persisted traces contain no raw secret
+- bearer, credential-assignment, email, and phone free-text redaction
+- observation and goal redaction before provider transmission
+- sensitive action-payload rejection before execution
+- result, error, approval, audit, persistence, and API-return redaction
+- sensitive HTTP headers restricted to environment-variable references
 
-### 10. Commit a frontend lockfile
+This is defense in depth, not a claim of complete DLP or regulatory compliance.
 
-`web/package-lock.json` is absent, so CI uses dependency resolution rather than a committed dependency graph.
+### Dependency reproducibility — PASS
 
-Promotion gate:
+Committed files:
 
-- commit `web/package-lock.json`
-- replace `npm install` with `npm ci` in CI and Pages workflows
-- verify local, CI, Docker, and static export use the same lockfile
+- `requirements.runtime.lock.txt`
+- `requirements.lock.txt`
+- `web/package-lock.json`
 
-## P2 — reviewer experience
+CI, Docker, local commands, frontend builds, and Pages builds use committed dependency graphs.
 
-- Add visible keyboard focus styles and `aria-live` for run-state changes.
-- Add one-click links from the demo to architecture, tests, and claim boundaries.
-- Add a concise “What is real here?” panel above the fold.
-- Add release tags and a changelog for portfolio milestones.
-- Add dependency and code-security scanning without claiming compliance certification.
+## Closed P2 reviewer-experience findings
 
-## Repository-level account actions
+- visible keyboard focus styles
+- `aria-live` for run status and errors
+- one-click source and claim-boundary links
+- “What is real here?” panel above the fold
+- release changelog
+- MIT license
+- security reporting policy
+- weekly dependency update monitoring
+- CI concurrency cancellation for stale runs
+- non-root containers, health checks, read-only filesystems, and `no-new-privileges`
 
-These cannot be completed by a code commit and require GitHub UI access:
+## Verification values
 
-1. Enable Pages with GitHub Actions as the source.
-2. Pin `AI-AI`, `BLACK`, and `black-pokemon-championship` on the profile.
-3. Archive or privatize obsolete public repositories after preserving any unique work.
+The committed manifest records:
+
+```json
+{
+  "different_run_ids_same_input": true,
+  "duplicate_execution_count": 1,
+  "blocked_execution_count": 0,
+  "conflict_execution_count": 0,
+  "approved_execution_count": 1
+}
+```
+
+## Remaining account-level GitHub actions
+
+These are not code gaps and cannot be truthfully marked complete by a repository commit:
+
+1. Enable repository-level GitHub Pages with GitHub Actions as the source.
+2. Verify the clean Pages URL returns HTTP 200 and update `docs/live-status.json` through the deployment workflow.
+3. Set actual profile pins for `AI-AI`, `BLACK`, and `black-pokemon-championship`.
+4. Archive or privatize obsolete repositories only after unique-code review.
 
 ## Promotion rule
 
-The public portfolio is considered complete only when:
-
 ```text
-clean Pages URL HTTP 200
-+ readable desktop/mobile evidence
-+ deterministic demo fingerprints
-+ blocked-action demonstration
-+ visible idempotency demonstration
-+ streaming response limits
-+ secret/PII redaction
-+ lockfile-reproducible frontend build
-+ actual profile pins verified
+CODE COMPLETE
+  readable desktop/mobile/GIF proof
+  deterministic fingerprints
+  blocked-action proof
+  visible idempotency proof
+  streaming response limits
+  sensitive-data boundary
+  committed dependency locks
+  browser + API + Docker + Compose verification
+
+ACCOUNT HOLD
+  clean Pages URL HTTP 200
+  actual profile pins verified
 ```
+
+No account-level setting is represented as complete until independently observed.
