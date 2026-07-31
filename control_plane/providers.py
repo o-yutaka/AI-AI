@@ -175,21 +175,20 @@ class OpenAICompatiblePlanner:
                 timeout=self._timeout_seconds,
                 transport=self._transport,
                 follow_redirects=False,
-            ) as client:
-                with client.stream(
-                    "POST",
-                    f"{self.base_url}/chat/completions",
-                    headers=headers,
-                    json=body,
-                ) as response:
-                    response.raise_for_status()
-                    content = _read_bounded_response(
-                        response,
-                        self._max_response_bytes,
-                    )
-                    response_payload = json.loads(
-                        content.decode(response.encoding or "utf-8")
-                    )
+            ) as client, client.stream(
+                "POST",
+                f"{self.base_url}/chat/completions",
+                headers=headers,
+                json=body,
+            ) as response:
+                response.raise_for_status()
+                content = _read_bounded_response(
+                    response,
+                    self._max_response_bytes,
+                )
+                response_payload = json.loads(
+                    content.decode(response.encoding or "utf-8")
+                )
         except ProviderResponseError:
             raise
         except (httpx.HTTPError, UnicodeDecodeError, json.JSONDecodeError) as exc:
