@@ -14,37 +14,37 @@
       "file": "ai-agent-control-plane-desktop-waiting.jpg",
       "width": 1440,
       "height": 1895,
-      "bytes": 229966
+      "bytes": 229903
     },
     {
       "file": "ai-agent-control-plane-desktop-approved.jpg",
       "width": 1440,
       "height": 1979,
-      "bytes": 240910
+      "bytes": 240831
     },
     {
       "file": "ai-agent-control-plane-desktop-blocked.jpg",
       "width": 1440,
       "height": 2047,
-      "bytes": 235841
+      "bytes": 235851
     },
     {
       "file": "ai-agent-control-plane-desktop-idempotency.jpg",
       "width": 1440,
       "height": 1937,
-      "bytes": 230340
+      "bytes": 230164
     },
     {
       "file": "ai-agent-control-plane-mobile-waiting.jpg",
       "width": 390,
       "height": 3841,
-      "bytes": 206196
+      "bytes": 206182
     },
     {
       "file": "ai-agent-control-plane-proof.gif",
       "width": 640,
       "height": 600,
-      "bytes": 297015
+      "bytes": 297028
     }
   ]
 }
