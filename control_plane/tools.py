@@ -83,7 +83,7 @@ class HttpJsonToolAdapter:
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         self._config = config
-        self._environment = environment or os.environ
+        self._environment = environment if environment is not None else os.environ
         self._transport = transport
 
     @staticmethod
