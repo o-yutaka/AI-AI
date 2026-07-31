@@ -31,10 +31,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Generate Python dependency lock
+      - name: Generate exact Python dependency lock
         run: |
-          python -m pip install --upgrade pip pip-tools
-          pip-compile --extra dev --resolver backtracking --strip-extras --output-file requirements.lock.txt pyproject.toml
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip freeze --exclude-editable | LC_ALL=C sort > requirements.lock.txt
+          test -s requirements.lock.txt
       - uses: actions/upload-artifact@v4
         with:
           name: generated-lockfiles
@@ -56,11 +58,29 @@ jobs:
           python -m pip install --upgrade pip
           pip install playwright==1.55.0 pillow==11.3.0
           python -m playwright install --with-deps chromium
+      - name: Start local proof server
+        run: |
+          python -m http.server 4173 --directory docs > /tmp/ai-ai-proof-server.log 2>&1 &
+          echo $! > /tmp/ai-ai-proof-server.pid
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:4173/live-demo.html > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/ai-ai-proof-server.log
+          exit 1
       - name: Verify interactions and capture proof
         run: >-
           python scripts/capture_visual_proof.py
-          --url "file://${GITHUB_WORKSPACE}/docs/live-demo.html"
+          --url http://127.0.0.1:4173/live-demo.html
           --output docs/assets/proof
+      - name: Stop local proof server
+        if: always()
+        run: |
+          if [ -f /tmp/ai-ai-proof-server.pid ]; then
+            kill "$(cat /tmp/ai-ai-proof-server.pid)" || true
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: visual-proof-assets
