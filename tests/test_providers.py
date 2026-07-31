@@ -84,6 +84,7 @@ def test_openai_compatible_planner_returns_validated_candidates() -> None:
     assert captured["authorization"] == "Bearer test-secret"
     assert captured["body"]["temperature"] == 0
     assert captured["body"]["response_format"] == {"type": "json_object"}
+    assert "Do not include credentials" in captured["body"]["messages"][0]["content"]
     assert result.provider == "openai-compatible"
     assert result.model == "frontier-code"
     assert result.candidates[0].action_id == "reply"
@@ -134,4 +135,23 @@ def test_provider_rejects_malformed_candidate_content() -> None:
     )
 
     with pytest.raises(ProviderResponseError, match="CandidateAction"):
+        planner.plan(request())
+
+
+def test_provider_aborts_when_stream_crosses_response_limit() -> None:
+    def handler(http_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/json"},
+            content=b"x" * 2048,
+        )
+
+    planner = OpenAICompatiblePlanner(
+        base_url="https://provider.example/v1",
+        model="frontier-code",
+        max_response_bytes=1024,
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(ProviderResponseError, match="size limit"):
         planner.plan(request())
