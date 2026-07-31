@@ -1,10 +1,11 @@
 {
-  "checked_at": "2026-07-31T17:12:22.466661+00:00",
-  "commit_sha": "8b2627f359f0d52d6d9ae172c193bc9699802002",
+  "checked_at": "2026-07-31T17:14:43.481414+00:00",
+  "commit_sha": "517ad0b6e5b53455adddeb8fb1399361e2c092b6",
   "build_result": "failure",
   "deploy_result": "skipped",
   "verification_result": "not_run",
   "http_status": null,
   "page_url": null,
-  "workflow_run_url": "https://github.com/o-yutaka/AI-AI/actions/runs/30650100461"
+  "reason": "pages_not_enabled_or_not_configured_for_github_actions",
+  "workflow_run_url": "https://github.com/o-yutaka/AI-AI/actions/runs/30650347727"
 }
