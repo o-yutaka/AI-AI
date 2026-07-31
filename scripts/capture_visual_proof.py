@@ -29,6 +29,20 @@ def wait_for_status(page: Page, status: str) -> None:
     )
 
 
+def replay_same_and_wait(page: Page) -> None:
+    page.locator("#replaySame").click()
+    page.wait_for_function(
+        "() => document.querySelector('#metricReplay')?.textContent?.trim() === 'REUSED'"
+    )
+
+
+def replay_conflict_and_wait(page: Page) -> None:
+    page.locator("#replayConflict").click()
+    page.wait_for_function(
+        "() => document.querySelector('#result')?.textContent?.includes('IdempotencyConflictError')"
+    )
+
+
 def verify_demo(page: Page, base_url: str) -> dict[str, Any]:
     page.goto(base_url, wait_until="networkidle")
     click_and_wait(page, "#lowRisk", "completed")
@@ -44,12 +58,11 @@ def verify_demo(page: Page, base_url: str) -> dict[str, Any]:
     assert second_identity["run_id"] != first_run_id
     assert second_identity["request_fingerprint"] == first_fingerprint
 
-    click_and_wait(page, "#replaySame", "completed")
+    replay_same_and_wait(page)
     replay_identity = read_json(page, "#identity")
     assert replay_identity["run_id"] == second_identity["run_id"]
     assert replay_identity["execution_count"] == 1
     assert replay_identity["idempotency_replayed"] is True
-    assert page.locator("#metricReplay").inner_text() == "REUSED"
 
     click_and_wait(page, "#blockedRisk", "blocked")
     blocked_identity = read_json(page, "#identity")
@@ -63,7 +76,7 @@ def verify_demo(page: Page, base_url: str) -> dict[str, Any]:
     ):
         assert reason in blocked_text
 
-    click_and_wait(page, "#replayConflict", "blocked")
+    replay_conflict_and_wait(page)
     conflict = read_json(page, "#result")
     assert conflict["error_type"] == "IdempotencyConflictError"
     conflict_identity = read_json(page, "#identity")
@@ -111,7 +124,7 @@ def capture(page: Page, base_url: str, output: Path) -> list[Path]:
 
     page.locator("#reset").click()
     click_and_wait(page, "#lowRisk", "completed")
-    click_and_wait(page, "#replaySame", "completed")
+    replay_same_and_wait(page)
     replay = output / "ai-agent-control-plane-desktop-idempotency.png"
     page.screenshot(path=str(replay), full_page=True)
     generated.append(replay)
