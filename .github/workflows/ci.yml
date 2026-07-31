@@ -81,23 +81,40 @@ jobs:
 
           docker compose up --build --detach
 
-          api_ok=false
-          web_ok=false
+          ready=false
           for attempt in $(seq 1 60); do
+            api_ok=false
+            web_ok=false
+            api_health="missing"
+            web_health="missing"
+
             if curl --fail --silent http://127.0.0.1:8000/health > /tmp/api-health.json; then
               api_ok=true
             fi
             if curl --fail --silent http://127.0.0.1:3000/ > /tmp/dashboard.html; then
               web_ok=true
             fi
-            if [ "$api_ok" = true ] && [ "$web_ok" = true ]; then
+
+            api_id="$(docker compose ps --quiet api)"
+            web_id="$(docker compose ps --quiet web)"
+            if [ -n "$api_id" ]; then
+              api_health="$(docker inspect --format '{{.State.Health.Status}}' "$api_id")"
+            fi
+            if [ -n "$web_id" ]; then
+              web_health="$(docker inspect --format '{{.State.Health.Status}}' "$web_id")"
+            fi
+
+            if [ "$api_ok" = true ] \
+              && [ "$web_ok" = true ] \
+              && [ "$api_health" = "healthy" ] \
+              && [ "$web_health" = "healthy" ]; then
+              ready=true
               break
             fi
             sleep 2
           done
 
-          test "$api_ok" = true
-          test "$web_ok" = true
+          test "$ready" = true
           grep --quiet '"version":"0.5.0"' /tmp/api-health.json
           grep --quiet "AI Agent Control Plane" /tmp/dashboard.html
 
