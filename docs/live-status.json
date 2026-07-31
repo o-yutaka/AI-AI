@@ -1,11 +1,14 @@
 {
-  "checked_at": "2026-07-31T17:14:43.481414+00:00",
-  "commit_sha": "517ad0b6e5b53455adddeb8fb1399361e2c092b6",
-  "build_result": "failure",
-  "deploy_result": "skipped",
-  "verification_result": "not_run",
-  "http_status": null,
-  "page_url": null,
-  "reason": "pages_not_enabled_or_not_configured_for_github_actions",
-  "workflow_run_url": "https://github.com/o-yutaka/AI-AI/actions/runs/30650347727"
+  "checked_at": "2026-07-31T17:20:29.022952+00:00",
+  "commit_sha": "1a3a3cffe57ea17da573b223c6794cc4fb921369",
+  "mirror_url": "https://raw.githack.com/o-yutaka/AI-AI/main/docs/live-demo.html",
+  "mirror_verification_result": "success",
+  "mirror_http_status": "200",
+  "pages_build_result": "failure",
+  "pages_deploy_result": "skipped",
+  "pages_verification_result": "not_run",
+  "pages_http_status": null,
+  "pages_url": null,
+  "pages_reason": "pages_not_enabled_or_not_configured_for_github_actions",
+  "workflow_run_url": "https://github.com/o-yutaka/AI-AI/actions/runs/30650727529"
 }
