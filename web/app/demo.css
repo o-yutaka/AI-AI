@@ -1,0 +1,17 @@
+.demo-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.demo-badges span {
+  padding: 7px 10px;
+  border: 1px solid rgba(185, 255, 102, 0.2);
+  border-radius: 999px;
+  background: rgba(185, 255, 102, 0.06);
+  color: #b9ff66;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
