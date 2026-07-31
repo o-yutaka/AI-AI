@@ -106,15 +106,11 @@ class AgentRuntime:
         self._repository.save(self._clone(trace))
 
     def _redacted_candidate(self, candidate: CandidateAction) -> CandidateAction:
-        return candidate.model_copy(
-            update={
-                "payload": redact_value(
-                    candidate.payload,
-                    sensitive_keys=self._sensitive_keys,
-                )
-            },
-            deep=True,
+        payload = redact_value(
+            candidate.model_dump(mode="json"),
+            sensitive_keys=self._sensitive_keys,
         )
+        return CandidateAction.model_validate(payload)
 
     @staticmethod
     def _rank_candidates(candidates: list[CandidateAction]) -> list[CandidateAction]:
@@ -251,12 +247,9 @@ class AgentRuntime:
                 )
             ]
 
-            redacted_candidates = [
-                self._redacted_candidate(candidate) for candidate in request.candidates
-            ]
             trace = DecisionTrace(
                 idempotency_key=request.idempotency_key,
-                goal=request.goal,
+                goal=redact_text(request.goal),
                 observation=redact_value(
                     request.observation,
                     sensitive_keys=self._sensitive_keys,
@@ -264,7 +257,10 @@ class AgentRuntime:
                 observation_fingerprint=self._fingerprint(request.observation),
                 request_fingerprint=request_fingerprint,
                 contract_version=request.contract.version,
-                candidates=redacted_candidates,
+                candidates=[
+                    self._redacted_candidate(candidate)
+                    for candidate in request.candidates
+                ],
                 eligible_action_ids=[candidate.action_id for candidate in eligible],
                 rejected_actions=rejected,
                 policy_checks=checks,
@@ -379,9 +375,10 @@ class AgentRuntime:
             if trace.status is not RunStatus.WAITING_APPROVAL:
                 raise InvalidRunStateError("run is not waiting for approval")
 
+            approver = redact_text(request.approver)
             trace.approval = ApprovalRecord(
                 decision=request.decision,
-                approver=request.approver,
+                approver=approver,
                 reason=redact_text(request.reason),
             )
             trace.updated_at = utc_now()
@@ -392,14 +389,14 @@ class AgentRuntime:
                 trace.events.append(
                     AuditEvent(
                         event_type="approval_rejected",
-                        details={"approver": request.approver},
+                        details={"approver": approver},
                     )
                 )
             else:
                 trace.events.append(
                     AuditEvent(
                         event_type="approval_granted",
-                        details={"approver": request.approver},
+                        details={"approver": approver},
                     )
                 )
                 self._execute(trace)
