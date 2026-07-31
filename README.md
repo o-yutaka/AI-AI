@@ -2,13 +2,25 @@
 
 [![CI](https://github.com/o-yutaka/AI-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/o-yutaka/AI-AI/actions/workflows/ci.yml)
 
-A working full-stack portfolio for **contract-aware, auditable, human-approved AI agents**.
+A working full-stack reference system for **contract-aware, auditable, human-approved AI agents**.
 
-- **Backend:** Python, FastAPI, Pydantic
-- **Frontend:** TypeScript, Next.js App Router, React
-- **Operations:** pytest, Ruff, Docker Compose, GitHub Actions
+The project demonstrates the engineering around an AI model: which actions it is allowed to take, why one action was selected, which candidates were rejected, when human approval is mandatory, how duplicate side effects are prevented, and how the complete decision survives a process restart.
 
-The architecture is extracted from a stateful competition agent connected to a strict external simulation engine. The public demo translates the same engineering constraints into a customer-support workflow: the agent may execute only currently allowed actions, must respect permissions, requires evidence and human approval for high-impact operations, prevents duplicate side effects, and preserves a complete decision trace.
+## Engineering proof
+
+| Concern | Implemented evidence |
+|---|---|
+| API and validation | FastAPI + Pydantic request/response contracts |
+| Allowed tool boundary | Versioned action contract and allow-list filtering |
+| Authorization | Per-action permission requirements |
+| High-impact safety | Evidence requirement plus named human approval/rejection |
+| Deterministic decisions | Stable ranking, tie-breaking, and request fingerprints |
+| Duplicate prevention | Idempotency key with conflicting-request detection |
+| Auditability | Timestamped events, policy checks, rejected reasons, revisions |
+| Failure handling | Structured executor error recorded in the trace |
+| Restart safety | Pluggable repository with durable SQLite implementation |
+| Full-stack operations | Next.js dashboard for run, review, approval, and trace inspection |
+| Delivery | Docker Compose and GitHub Actions |
 
 ## Run the full stack
 
@@ -22,53 +34,16 @@ Open:
 - FastAPI/OpenAPI: `http://localhost:8000/docs`
 - Health: `http://localhost:8000/health`
 
-The dashboard can run:
+Docker Compose configures `AGENT_DB_PATH=/data/control-plane.sqlite3` and a named volume. Completed runs, pending approvals, and idempotency records remain available after the API container restarts.
 
-1. A low-risk support workflow that executes immediately
-2. A high-risk refund workflow that pauses for approval
-3. Approve or reject the pending action
-4. Inspect selected and rejected actions, policy checks, audit events, result/error, and trace fingerprints
+## Demo flow
 
-## What is implemented
-
-### Agent runtime
-
-- Versioned external action contract
-- Action allow-list enforcement
-- Per-action permission checks
-- High-risk evidence requirement
-- Deterministic ranking and tie-breaking
-- High-risk and irreversible action approval gate
-- Named approval or rejection with a reason
-- Idempotency protection against duplicate execution
-- Conflict detection when one idempotency key is reused for different input
-- Structured executor-failure recording
-- Observation and request fingerprints
-- Timestamped audit events and revision tracking
-- Defensive-copy in-memory storage
-
-### API
-
-```text
-GET  /health
-POST /v1/runs
-GET  /v1/runs
-GET  /v1/runs/{run_id}
-POST /v1/runs/{run_id}/decision
-```
-
-### Operations dashboard
-
-- Current status and selected action
-- Risk and reversibility
-- Contract version and trace revision
-- Eligible and rejected candidate counts
-- Rejected actions with exact reasons
-- Policy checks and details
-- Human approval/rejection controls
-- Audit-event timeline
-- Result or structured error
-- Observation and request fingerprints
+1. Submit a low-risk support workflow and observe immediate execution.
+2. Submit a high-risk refund workflow with supporting evidence.
+3. Inspect the selected action, lower-ranked candidates, contract checks, and exact rejection reasons.
+4. Approve or reject the pending action with an operator name and reason.
+5. Restart the API container and retrieve the same trace.
+6. Resubmit the same idempotent request and verify that the executor is not called twice.
 
 ## Architecture
 
@@ -90,7 +65,88 @@ Contract  Candidate    Policy
           Executor
              |
   audit events + result/error
+             |
+      RunRepository
+       /          \
+  in-memory      SQLite
 ```
+
+`AgentRuntime` owns decision policy, not persistence details. It depends on a small `RunRepository` protocol:
+
+- `InMemoryRunRepository` keeps the embedded/test path simple.
+- `SQLiteRunRepository` stores validated `DecisionTrace` JSON, indexes idempotency keys, uses WAL mode, and supports approval continuation after restart.
+
+See [`docs/adr/0001-durable-run-store.md`](docs/adr/0001-durable-run-store.md) for the decision, guarantees, trade-offs, and non-goals.
+
+## Agent runtime
+
+- Versioned external action contract
+- Action allow-list enforcement
+- Per-action permission checks
+- High-risk evidence requirement
+- Deterministic ranking and tie-breaking
+- High-risk and irreversible action approval gate
+- Named approval or rejection with a reason
+- Idempotency protection against duplicate execution
+- Conflict detection when one idempotency key is reused for different input
+- Structured executor-failure recording
+- Observation and request fingerprints
+- Timestamped audit events and revision tracking
+- Defensive-copy repository reads
+- Restart-safe SQLite persistence without an additional database package
+
+## API
+
+```text
+GET  /health
+POST /v1/runs
+GET  /v1/runs
+GET  /v1/runs/{run_id}
+POST /v1/runs/{run_id}/decision
+```
+
+### Low-risk run
+
+```bash
+curl -X POST http://localhost:8000/v1/runs \
+  -H "Content-Type: application/json" \
+  --data @examples/low-risk-run.json
+```
+
+### Approval-gated run
+
+```bash
+curl -X POST http://localhost:8000/v1/runs \
+  -H "Content-Type: application/json" \
+  --data @examples/high-risk-run.json
+```
+
+### Approve
+
+```bash
+curl -X POST http://localhost:8000/v1/runs/<run_id>/decision \
+  -H "Content-Type: application/json" \
+  -d '{
+    "decision": "approve",
+    "approver": "ops@example.com",
+    "reason": "Evidence and policy verified"
+  }'
+```
+
+Use `"decision": "reject"` to reject. A rejected run never calls the executor.
+
+## Operations dashboard
+
+- Current run status and selected action
+- Risk and reversibility
+- Contract version and trace revision
+- Eligible and rejected candidate counts
+- Rejected actions with exact reasons
+- Policy checks and details
+- Human approval/rejection controls
+- Audit-event timeline
+- Result or structured error
+- Observation and request fingerprints
 
 ## Local backend development
 
@@ -114,6 +170,14 @@ pytest -q
 uvicorn app:app --reload
 ```
 
+Use SQLite outside Docker:
+
+```bash
+AGENT_DB_PATH=.data/control-plane.sqlite3 uvicorn app:app --reload
+```
+
+Without `AGENT_DB_PATH`, the app uses the in-memory repository.
+
 ## Local frontend development
 
 ```bash
@@ -124,51 +188,6 @@ npm run dev
 
 The default API URL is `http://localhost:8000`. Override it at build time with `NEXT_PUBLIC_API_BASE_URL`.
 
-## API examples
-
-Low risk:
-
-```bash
-curl -X POST http://localhost:8000/v1/runs \
-  -H "Content-Type: application/json" \
-  --data @examples/low-risk-run.json
-```
-
-Approval gated:
-
-```bash
-curl -X POST http://localhost:8000/v1/runs \
-  -H "Content-Type: application/json" \
-  --data @examples/high-risk-run.json
-```
-
-Approve:
-
-```bash
-curl -X POST http://localhost:8000/v1/runs/<run_id>/decision \
-  -H "Content-Type: application/json" \
-  -d '{
-    "decision": "approve",
-    "approver": "ops@example.com",
-    "reason": "Evidence and policy verified"
-  }'
-```
-
-Use `"decision": "reject"` to reject. A rejected run never calls the executor.
-
-## Why the Pokémon competition work is relevant
-
-| Competition-agent constraint | Business-agent equivalent | Public implementation |
-|---|---|---|
-| Select only engine-provided options | Call only currently allowed APIs/tools | Versioned action contract |
-| Preserve option and workflow state | Preserve transaction state | Stateful run trace |
-| Do not assume hidden information | Do not treat unavailable data as fact | Caller observation + fingerprint |
-| Resource-sensitive decisions | Cost, inventory, permissions, rate limits | Policy metadata and checks |
-| Invalid action is unacceptable | Unauthorized or unsupported API call | Candidate filtering |
-| Replay and policy comparison | Audit and regression evaluation | Decision events and tests |
-
-Read [docs/case-study-pokemon.md](docs/case-study-pokemon.md) for the detailed transfer boundary.
-
 ## Repository structure
 
 ```text
@@ -177,27 +196,28 @@ Read [docs/case-study-pokemon.md](docs/case-study-pokemon.md) for the detailed t
 ├── control_plane/
 │   ├── errors.py
 │   ├── models.py
-│   └── runtime.py
+│   ├── runtime.py
+│   └── store.py
 ├── tests/
 │   ├── test_api.py
+│   ├── test_persistence.py
 │   └── test_runtime.py
 ├── web/
 │   ├── app/
-│   │   ├── globals.css
-│   │   ├── layout.tsx
-│   │   └── page.tsx
 │   ├── Dockerfile
-│   ├── package.json
-│   └── tsconfig.json
+│   └── package.json
 ├── examples/
 ├── docs/
+│   ├── adr/
+│   ├── case-study-pokemon.md
+│   └── evidence.md
 ├── Dockerfile
 ├── docker-compose.yml
 ├── pyproject.toml
 └── .github/workflows/ci.yml
 ```
 
-## CI gates
+## Verification gates
 
 GitHub Actions verifies:
 
@@ -207,19 +227,50 @@ GitHub Actions verifies:
 - Backend Docker image build
 - Frontend Docker image build
 
+Persistence tests specifically verify:
+
+- a completed idempotent run is not executed again after restart
+- a pending high-risk action can be approved after restart
+- listed/deserialized traces cannot mutate stored state
+
+## Transfer from strict simulation agents
+
+The architecture was extracted from a stateful competition agent connected to a strict external engine, then translated into a business workflow instead of publishing game-specific policy as the product.
+
+| Strict-engine constraint | Business-agent equivalent | Public implementation |
+|---|---|---|
+| Select only engine-provided options | Call only currently allowed tools | Versioned action contract |
+| Preserve option and workflow state | Preserve transaction state | Durable run trace |
+| Do not assume hidden information | Do not treat unavailable data as fact | Caller observation + fingerprint |
+| Resource-sensitive decisions | Permissions, cost, rate limits | Policy metadata and checks |
+| Invalid action is unacceptable | Unauthorized or unsupported API call | Candidate filtering |
+| Replay and policy comparison | Audit and regression evaluation | Decision events and tests |
+
+Read [`docs/case-study-pokemon.md`](docs/case-study-pokemon.md) for the transfer boundary.
+
 ## Claim boundary
 
-This is a portfolio-grade reference system, not a finished enterprise platform. It currently uses in-memory storage and a deterministic example executor. It does **not** claim production authentication, tenant isolation, PostgreSQL persistence, durable queues, real SaaS connectors, a live LLM provider router, load-test evidence, or production SLOs.
+This is a portfolio-grade reference system, not a finished enterprise platform.
 
-See [docs/evidence.md](docs/evidence.md) for the exact distinction between public reproducible evidence and private source-project context.
+It demonstrates a durable single-node control plane, but it does **not** claim:
+
+- production authentication or tenant isolation
+- PostgreSQL or distributed database operation
+- durable background queues
+- real CRM, email, billing, or RAG connectors
+- a live LLM planner/provider router
+- load-test evidence or production SLOs
+- multi-region replication or distributed transactions
+
+See [`docs/evidence.md`](docs/evidence.md) for the distinction between public reproducible evidence and private source-project context.
 
 ## Next priorities
 
-1. PostgreSQL repository and append-only audit store
-2. Authentication, RBAC, and tenant isolation
-3. Async tool executor with timeout and retry policy
-4. OpenAI-compatible planner/provider adapter
-5. CRM, email, RAG, and billing adapters
+1. Authentication, RBAC, and tenant isolation
+2. Async tool executor with timeout and retry policy
+3. OpenAI-compatible planner/provider adapter
+4. CRM, email, RAG, and billing adapters
+5. Append-only audit/event storage
 6. Evaluation fixtures and measured policy-promotion gates
 
 ## Author
