@@ -5,7 +5,7 @@ const nextConfig = isGitHubPages
   ? {
       output: "export",
       basePath: "/AI-AI",
-      assetPrefix: "/AI-AI/",
+      assetPrefix: "/AI-AI",
       trailingSlash: true,
     }
   : {
