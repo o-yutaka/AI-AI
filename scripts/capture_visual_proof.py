@@ -100,34 +100,40 @@ def verify_demo(page: Page, base_url: str) -> dict[str, Any]:
     }
 
 
+def screenshot(page: Page, output: Path, name: str) -> Path:
+    path = output / name
+    page.screenshot(path=str(path), full_page=True, type="jpeg", quality=82)
+    return path
+
+
 def capture(page: Page, base_url: str, output: Path) -> list[Path]:
     output.mkdir(parents=True, exist_ok=True)
     generated: list[Path] = []
 
     page.goto(base_url, wait_until="networkidle")
     click_and_wait(page, "#highRisk", "waiting approval")
-    waiting = output / "ai-agent-control-plane-desktop-waiting.png"
-    page.screenshot(path=str(waiting), full_page=True)
-    generated.append(waiting)
+    generated.append(
+        screenshot(page, output, "ai-agent-control-plane-desktop-waiting.jpg")
+    )
 
     page.locator("#approve").click()
     wait_for_status(page, "completed")
-    approved = output / "ai-agent-control-plane-desktop-approved.png"
-    page.screenshot(path=str(approved), full_page=True)
-    generated.append(approved)
+    generated.append(
+        screenshot(page, output, "ai-agent-control-plane-desktop-approved.jpg")
+    )
 
     page.locator("#reset").click()
     click_and_wait(page, "#blockedRisk", "blocked")
-    blocked = output / "ai-agent-control-plane-desktop-blocked.png"
-    page.screenshot(path=str(blocked), full_page=True)
-    generated.append(blocked)
+    generated.append(
+        screenshot(page, output, "ai-agent-control-plane-desktop-blocked.jpg")
+    )
 
     page.locator("#reset").click()
     click_and_wait(page, "#lowRisk", "completed")
     replay_same_and_wait(page)
-    replay = output / "ai-agent-control-plane-desktop-idempotency.png"
-    page.screenshot(path=str(replay), full_page=True)
-    generated.append(replay)
+    generated.append(
+        screenshot(page, output, "ai-agent-control-plane-desktop-idempotency.jpg")
+    )
 
     return generated
 
@@ -140,42 +146,51 @@ def capture_mobile(browser: Any, base_url: str, output: Path) -> Path:
     page = context.new_page()
     page.goto(base_url, wait_until="networkidle")
     click_and_wait(page, "#highRisk", "waiting approval")
-    path = output / "ai-agent-control-plane-mobile-waiting.png"
-    page.screenshot(path=str(path), full_page=True)
+    path = screenshot(page, output, "ai-agent-control-plane-mobile-waiting.jpg")
     context.close()
     return path
 
 
-def create_gif(images: list[Path], output: Path) -> None:
-    frames = [Image.open(path).convert("RGB") for path in images]
-    width = max(frame.width for frame in frames)
-    height = max(frame.height for frame in frames)
-    normalized: list[Image.Image] = []
-    for frame in frames:
-        canvas = Image.new("RGB", (width, height), (8, 11, 8))
-        canvas.paste(frame, (0, 0))
-        normalized.append(canvas)
-    normalized[0].save(
+def create_compact_gif(images: list[Path], output: Path) -> None:
+    frames: list[Image.Image] = []
+    for path in images:
+        with Image.open(path) as source:
+            frame = source.convert("RGB")
+            frame = frame.crop((0, 0, frame.width, min(1350, frame.height)))
+            width = 640
+            height = round(frame.height * width / frame.width)
+            frame = frame.resize((width, height), Image.Resampling.LANCZOS)
+            frame = frame.quantize(
+                colors=48,
+                method=Image.Quantize.MEDIANCUT,
+                dither=Image.Dither.NONE,
+            )
+            frames.append(frame)
+    frames[0].save(
         output,
         save_all=True,
-        append_images=normalized[1:],
-        duration=[1500, 1500, 1800, 1800],
+        append_images=frames[1:],
+        duration=[1400, 1400, 1700, 1700],
         loop=0,
         optimize=True,
+        disposal=2,
     )
-    for frame in frames:
-        frame.close()
 
 
 def dimensions(path: Path) -> dict[str, int | str]:
     with Image.open(path) as image:
-        return {"file": path.name, "width": image.width, "height": image.height}
+        return {
+            "file": path.name,
+            "width": image.width,
+            "height": image.height,
+            "bytes": path.stat().st_size,
+        }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", required=True)
-    parser.add_argument("--output", default="docs/assets")
+    parser.add_argument("--output", default="docs/assets/proof")
     parser.add_argument("--verify-only", action="store_true")
     args = parser.parse_args()
 
@@ -190,10 +205,10 @@ def main() -> None:
             generated = capture(page, args.url, output)
             generated.append(capture_mobile(browser, args.url, output))
             gif = output / "ai-agent-control-plane-proof.gif"
-            create_gif(generated[:4], gif)
+            create_compact_gif(generated[:4], gif)
             generated.append(gif)
             manifest = {
-                "generated_from": args.url,
+                "generated_from": "docs/live-demo.html",
                 "browser": "chromium",
                 "verification": verification,
                 "assets": [dimensions(path) for path in generated],
