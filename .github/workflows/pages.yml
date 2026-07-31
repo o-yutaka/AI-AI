@@ -6,6 +6,8 @@ on:
     paths-ignore:
       - docs/live-status.json
   workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *"
 
 permissions:
   contents: write
@@ -80,7 +82,7 @@ jobs:
           fi
           echo "verification=$verification" >> "$GITHUB_OUTPUT"
           echo "http_status=$http_status" >> "$GITHUB_OUTPUT"
-      - name: Write machine-readable deployment evidence
+      - name: Write machine-readable deployment evidence when state changes
         env:
           VERIFICATION_RESULT: ${{ steps.verify.outputs.verification }}
           HTTP_STATUS: ${{ steps.verify.outputs.http_status }}
@@ -93,20 +95,38 @@ jobs:
           from datetime import datetime, timezone
           from pathlib import Path
 
-          payload = {
-              "checked_at": datetime.now(timezone.utc).isoformat(),
-              "commit_sha": os.environ["COMMIT_SHA"],
+          path = Path("docs/live-status.json")
+          reason = None
+          if os.environ["BUILD_RESULT"] == "failure" and os.environ["DEPLOY_RESULT"] == "skipped":
+              reason = "pages_not_enabled_or_not_configured_for_github_actions"
+          elif os.environ["DEPLOY_RESULT"] == "failure":
+              reason = "pages_deployment_failed"
+          elif os.environ["VERIFICATION_RESULT"] == "failure":
+              reason = "public_http_verification_failed"
+
+          stable = {
               "build_result": os.environ["BUILD_RESULT"],
               "deploy_result": os.environ["DEPLOY_RESULT"],
               "verification_result": os.environ["VERIFICATION_RESULT"],
               "http_status": os.environ["HTTP_STATUS"] or None,
               "page_url": os.environ["PAGE_URL"] or None,
+              "reason": reason,
+          }
+          previous = {}
+          if path.exists():
+              previous = json.loads(path.read_text(encoding="utf-8"))
+          previous_stable = {key: previous.get(key) for key in stable}
+          if previous_stable == stable:
+              raise SystemExit(0)
+
+          payload = {
+              "checked_at": datetime.now(timezone.utc).isoformat(),
+              "commit_sha": os.environ["COMMIT_SHA"],
+              **stable,
               "workflow_run_url": os.environ["WORKFLOW_RUN_URL"],
           }
-          Path("docs").mkdir(exist_ok=True)
-          Path("docs/live-status.json").write_text(
-              json.dumps(payload, indent=2) + "\n", encoding="utf-8"
-          )
+          path.parent.mkdir(exist_ok=True)
+          path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
           PY
       - name: Commit deployment evidence
         run: |
