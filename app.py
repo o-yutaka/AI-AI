@@ -10,18 +10,26 @@ from control_plane.errors import (
 )
 from control_plane.models import ApprovalRequest, DecisionTrace, RunRequest
 from control_plane.runtime import AgentRuntime
+from control_plane.store import SQLiteRunRepository
+
+
+def runtime_from_environment() -> AgentRuntime:
+    database_path = os.getenv("AGENT_DB_PATH")
+    if database_path:
+        return AgentRuntime(repository=SQLiteRunRepository(database_path))
+    return AgentRuntime()
 
 
 def create_app(runtime: AgentRuntime | None = None) -> FastAPI:
     app = FastAPI(
         title="AI Agent Control Plane",
-        version="0.2.0",
+        version="0.3.0",
         description=(
             "Contract-aware, auditable reference runtime for stateful, "
             "approval-aware AI agents."
         ),
     )
-    agent_runtime = runtime or AgentRuntime()
+    agent_runtime = runtime or runtime_from_environment()
     origins = [
         origin.strip()
         for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
@@ -37,7 +45,7 @@ def create_app(runtime: AgentRuntime | None = None) -> FastAPI:
 
     @app.get("/health")
     def health() -> dict[str, str]:
-        return {"status": "ok", "version": "0.2.0"}
+        return {"status": "ok", "version": "0.3.0"}
 
     @app.post(
         "/v1/runs",

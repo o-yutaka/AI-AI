@@ -3,6 +3,9 @@ services:
     build: .
     environment:
       CORS_ORIGINS: http://localhost:3000
+      AGENT_DB_PATH: /data/control-plane.sqlite3
+    volumes:
+      - agent_data:/data
     ports:
       - "8000:8000"
     restart: unless-stopped
@@ -17,3 +20,6 @@ services:
     ports:
       - "3000:3000"
     restart: unless-stopped
+
+volumes:
+  agent_data:

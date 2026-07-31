@@ -22,6 +22,7 @@ from .models import (
     RunStatus,
     utc_now,
 )
+from .store import InMemoryRunRepository, RunRepository
 
 Executor = Callable[[CandidateAction], dict[str, Any]]
 
@@ -35,10 +36,13 @@ _RISK_ORDER = {
 class AgentRuntime:
     """Contract-aware, approval-aware runtime with deterministic audit traces."""
 
-    def __init__(self, executor: Executor | None = None) -> None:
+    def __init__(
+        self,
+        executor: Executor | None = None,
+        repository: RunRepository | None = None,
+    ) -> None:
         self._executor = executor or self._default_executor
-        self._runs: dict[str, DecisionTrace] = {}
-        self._idempotency_index: dict[str, tuple[str, str]] = {}
+        self._repository = repository or InMemoryRunRepository()
         self._lock = RLock()
 
     @staticmethod
@@ -96,12 +100,7 @@ class AgentRuntime:
         return trace.model_copy(deep=True)
 
     def _store(self, trace: DecisionTrace) -> None:
-        self._runs[trace.run_id] = self._clone(trace)
-        if trace.idempotency_key:
-            self._idempotency_index[trace.idempotency_key] = (
-                trace.run_id,
-                trace.request_fingerprint,
-            )
+        self._repository.save(self._clone(trace))
 
     @staticmethod
     def _rank_candidates(candidates: list[CandidateAction]) -> list[CandidateAction]:
@@ -136,14 +135,15 @@ class AgentRuntime:
         with self._lock:
             request_fingerprint = self._request_fingerprint(request)
             if request.idempotency_key:
-                existing = self._idempotency_index.get(request.idempotency_key)
+                existing = self._repository.find_by_idempotency_key(
+                    request.idempotency_key
+                )
                 if existing:
-                    existing_run_id, existing_fingerprint = existing
-                    if existing_fingerprint != request_fingerprint:
+                    if existing.request_fingerprint != request_fingerprint:
                         raise IdempotencyConflictError(
                             "idempotency_key was already used for a different request"
                         )
-                    return self._clone(self._runs[existing_run_id])
+                    return self._clone(existing)
 
             rejected: list[RejectedAction] = []
             eligible: list[CandidateAction] = []
@@ -291,21 +291,21 @@ class AgentRuntime:
 
     def get_run(self, run_id: str) -> DecisionTrace:
         with self._lock:
-            try:
-                return self._clone(self._runs[run_id])
-            except KeyError as exc:
-                raise UnknownRunError(f"unknown run_id: {run_id}") from exc
+            trace = self._repository.get(run_id)
+            if trace is None:
+                raise UnknownRunError(f"unknown run_id: {run_id}")
+            return self._clone(trace)
 
     def list_runs(self) -> list[DecisionTrace]:
         with self._lock:
-            return [self._clone(trace) for trace in self._runs.values()]
+            return [self._clone(trace) for trace in self._repository.list()]
 
     def decide(self, run_id: str, request: ApprovalRequest) -> DecisionTrace:
         with self._lock:
-            try:
-                trace = self._clone(self._runs[run_id])
-            except KeyError as exc:
-                raise UnknownRunError(f"unknown run_id: {run_id}") from exc
+            trace = self._repository.get(run_id)
+            if trace is None:
+                raise UnknownRunError(f"unknown run_id: {run_id}")
+            trace = self._clone(trace)
 
             if trace.status is not RunStatus.WAITING_APPROVAL:
                 raise InvalidRunStateError("run is not waiting for approval")
