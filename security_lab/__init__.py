@@ -1,7 +1,10 @@
 from .belief import HypothesisBelief, initial_beliefs, select_next_probe, update_belief
+from .budget import BudgetPlan, allocate_budget
+from .candidate_pack import CandidatePackage, CandidateRecord, package_candidates
 from .competition import CompetitionAdapter, CompetitionSpec, KaggleAgentSecurityAdapter
 from .compiler import CompiledRequest, GenericChatCompiler, ModelCompiler
 from .compute import ComputeRequest, ComputeTarget, select_compute_target
+from .dataset import FrozenDataset, FrozenInstance, freeze_dataset
 from .evaluator import EvaluatorDimension, EvaluatorSpec, decompose_evaluator
 from .export_bridge import build_research_bundle
 from .freeze import CandidateFreeze, freeze_candidates
@@ -27,6 +30,7 @@ from .probe import compile_minimal_falsification_probe, compile_probe
 from .replay import ReplayResult, replay_probe
 from .reproducibility import sha256_file, stable_hash, verify_expected_hash
 from .robustness import RobustnessEnvelope, RobustnessSample, build_robustness_envelope
+from .runner import ExperimentCase, ExperimentRun, run_cases
 from .runtime_matrix import RuntimeMatrix, RuntimeVariant, build_runtime_matrix
 from .telemetry import RuntimeTelemetry, measure_runtime
 from .throughput import ThroughputEstimate, estimate_throughput
@@ -34,8 +38,11 @@ from .transfer import TransferEstimate, TransferPair, fit_linear_transfer
 
 __all__ = [
     "AttackPrimitive",
+    "BudgetPlan",
     "CandidateFreeze",
+    "CandidatePackage",
     "CandidateProfile",
+    "CandidateRecord",
     "CompiledRequest",
     "CompetitionAdapter",
     "CompetitionSpec",
@@ -45,8 +52,12 @@ __all__ = [
     "EnvironmentIdentity",
     "EvaluatorDimension",
     "EvaluatorSpec",
+    "ExperimentCase",
     "ExperimentManifest",
+    "ExperimentRun",
     "FamilyResult",
+    "FrozenDataset",
+    "FrozenInstance",
     "GenericChatCompiler",
     "Hypothesis",
     "HypothesisBelief",
@@ -75,6 +86,7 @@ __all__ = [
     "TransferEstimate",
     "TransferPair",
     "WeightedObjective",
+    "allocate_budget",
     "build_research_bundle",
     "build_robustness_envelope",
     "build_runtime_matrix",
@@ -85,11 +97,14 @@ __all__ = [
     "estimate_throughput",
     "fit_linear_transfer",
     "freeze_candidates",
+    "freeze_dataset",
     "initial_beliefs",
     "judge_family",
     "measure_runtime",
+    "package_candidates",
     "rank_and_judge",
     "replay_probe",
+    "run_cases",
     "score_families",
     "select_compute_target",
     "select_diverse_portfolio",
