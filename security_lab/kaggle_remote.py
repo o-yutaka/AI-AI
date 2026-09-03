@@ -1,36 +1,39 @@
 from __future__ import annotations
 
+import collections.abc
+import dataclasses
 import json
+import pathlib
 import shutil
 import subprocess
 import time
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
-from pathlib import Path
 
 
-CommandRunner = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
+CommandRunner = collections.abc.Callable[
+    [collections.abc.Sequence[str]],
+    subprocess.CompletedProcess[str],
+]
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class KaggleRemoteSpec:
     kernel_ref: str
-    source_dir: Path
-    output_dir: Path
+    source_dir: pathlib.Path
+    output_dir: pathlib.Path
     poll_seconds: float = 15.0
     timeout_seconds: float = 54_000.0
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class KaggleRemoteResult:
     kernel_ref: str
     status: str
-    output_dir: Path
+    output_dir: pathlib.Path
     output_files: tuple[str, ...]
 
 
 def stage_scratch_script(
-    destination: str | Path,
+    destination: str | pathlib.Path,
     *,
     kernel_ref: str,
     title: str,
@@ -38,8 +41,8 @@ def stage_scratch_script(
     competition_slug: str | None = None,
     enable_gpu: bool = True,
     machine_shape: str = "NvidiaTeslaT4",
-) -> Path:
-    root = Path(destination)
+) -> pathlib.Path:
+    root = pathlib.Path(destination)
     root.mkdir(parents=True, exist_ok=True)
     script = root / "black_kaggle_task.py"
     metadata = root / "kernel-metadata.json"
@@ -105,9 +108,13 @@ class KaggleRemoteRunner:
             return "QUEUED"
         return "UNKNOWN"
 
-    def output(self, kernel_ref: str, destination: str | Path) -> tuple[str, ...]:
+    def output(
+        self,
+        kernel_ref: str,
+        destination: str | pathlib.Path,
+    ) -> tuple[str, ...]:
         self._require_cli()
-        output_dir = Path(destination)
+        output_dir = pathlib.Path(destination)
         output_dir.mkdir(parents=True, exist_ok=True)
         self._run(
             [
@@ -162,5 +169,7 @@ class KaggleRemoteRunner:
             raise RuntimeError("Kaggle CLI not found; install it and run `kaggle auth login`")
 
 
-def _run_command(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+def _run_command(
+    command: collections.abc.Sequence[str],
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(list(command), check=True, capture_output=True, text=True)
