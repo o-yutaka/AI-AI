@@ -12,6 +12,15 @@ from .export_bridge import build_research_bundle
 from .freeze import CandidateFreeze, freeze_candidates
 from .hypothesis import HypothesisGraph, score_families
 from .judge import JudgeThresholds, JudgeVerdict, judge_family
+from .kaggle_remote import (
+    KaggleRemoteJob,
+    KaggleRemoteResult,
+    KaggleRemoteRunner,
+    KaggleRunMode,
+    directory_sha256,
+    stage_workspace,
+    workspace_fingerprint,
+)
 from .leakage import ResearchPurpose, assert_disjoint_instance_sets, assert_split_allowed
 from .ledger import LedgerRecord, append_record, load_records, verify_chain
 from .manifest import ExperimentManifest
@@ -74,6 +83,10 @@ __all__ = [
     "JudgeThresholds",
     "JudgeVerdict",
     "KaggleAgentSecurityAdapter",
+    "KaggleRemoteJob",
+    "KaggleRemoteResult",
+    "KaggleRemoteRunner",
+    "KaggleRunMode",
     "LedgerRecord",
     "ModelCompiler",
     "Objective",
@@ -111,6 +124,7 @@ __all__ = [
     "compile_minimal_falsification_probe",
     "compile_probe",
     "decompose_evaluator",
+    "directory_sha256",
     "estimate_throughput",
     "fit_linear_transfer",
     "freeze_candidates",
@@ -129,7 +143,9 @@ __all__ = [
     "select_next_probe",
     "sha256_file",
     "stable_hash",
+    "stage_workspace",
     "update_belief",
     "verify_chain",
     "verify_expected_hash",
+    "workspace_fingerprint",
 ]
