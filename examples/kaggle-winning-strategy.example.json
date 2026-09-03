@@ -1,0 +1,71 @@
+{
+  "target_expectation": {
+    "environment": {
+      "model_id": "example-model",
+      "runtime_id": "target-runtime",
+      "quantization": "target-format",
+      "evaluator_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "runtime_version": "1.0.0",
+      "compiler_id": "generic-chat.v1"
+    },
+    "required_verdict": "SUPPORTED",
+    "required_observable": "expected-observable",
+    "require_completed": true
+  },
+  "transfer_pairs": [
+    {"proxy_score": 0.0, "target_score": 0.0},
+    {"proxy_score": 1.0, "target_score": 0.9},
+    {"proxy_score": 2.0, "target_score": 1.8}
+  ],
+  "portfolio_limit": 1,
+  "ridge_alpha": 0.1,
+  "residual_multiplier": 1.0,
+  "minimum_runtime_success_rate": 1.0,
+  "maximum_runtime_score_range": 0.25,
+  "correlation_penalty": 1.0,
+  "candidates": [
+    {
+      "candidate_id": "candidate-a",
+      "family_id": "family-a",
+      "proxy_score": 1.5,
+      "throughput": 2.0,
+      "failures": [false, true, false],
+      "target_replay": {
+        "trajectory": {
+          "trajectory_id": "trajectory::candidate-a",
+          "probe_id": "probe::candidate-a",
+          "environment": {
+            "model_id": "example-model",
+            "runtime_id": "target-runtime",
+            "quantization": "target-format",
+            "evaluator_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "runtime_version": "1.0.0",
+            "compiler_id": "generic-chat.v1"
+          },
+          "steps": [{"kind": "recorded-replay-step"}],
+          "completed": true
+        },
+        "observation": {
+          "observation_id": "observation::candidate-a",
+          "probe_id": "probe::candidate-a",
+          "observable": "expected-observable",
+          "verdict": "SUPPORTED",
+          "metrics": {"margin": 0.5},
+          "evidence_refs": ["trajectory::candidate-a"]
+        }
+      },
+      "runtime_outcomes": [
+        {
+          "variant": {
+            "model_id": "example-model",
+            "runtime_id": "target-runtime",
+            "compiler_id": "generic-chat.v1",
+            "quantization": "target-format"
+          },
+          "score": 1.4,
+          "success": true
+        }
+      ]
+    }
+  ]
+}
