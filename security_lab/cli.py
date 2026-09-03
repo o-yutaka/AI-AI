@@ -9,9 +9,11 @@ from research_bundle.canonical import bundle_sha256, canonical_json
 from research_bundle.models import SecurityResearchBundle
 from .budget import allocate_budget
 from .candidate_pack import CandidateRecord, package_candidates
+from .competition import KaggleAgentSecurityAdapter
 from .compute import ComputeRequest, ComputeTarget, select_compute_target
 from .dataset import freeze_dataset
 from .manifest import ExperimentManifest
+from .research_plan import build_research_plan
 
 
 def main() -> int:
@@ -32,6 +34,8 @@ def main() -> int:
     budget.add_argument("total_units", type=float)
     package = subparsers.add_parser("package-candidates")
     package.add_argument("path", help="JSON array of candidate records")
+    research = subparsers.add_parser("plan-research")
+    research.add_argument("path", help="JSON research-plan specification")
 
     args = parser.parse_args()
     if args.command in {"verify-bundle", "canonicalize-bundle"}:
@@ -76,6 +80,28 @@ def main() -> int:
             "package_id": package_result.package_id,
             "canonical_sha256": package_result.canonical_sha256,
             "candidate_ids": [item.candidate_id for item in package_result.records],
+        }, sort_keys=True))
+        return 0
+    if args.command == "plan-research":
+        raw = json.loads(Path(args.path).read_text(encoding="utf-8"))
+        competition = KaggleAgentSecurityAdapter().normalize(raw["competition"])
+        plan = build_research_plan(
+            competition=competition,
+            dataset_id=raw["dataset_id"],
+            source_revision=raw["source_revision"],
+            instance_ids=raw["instance_ids"],
+            total_budget_units=float(raw["total_budget_units"]),
+            model_ids=raw["model_ids"],
+            runtime_ids=raw["runtime_ids"],
+            compiler_ids=raw["compiler_ids"],
+            quantizations=raw["quantizations"],
+        )
+        print(json.dumps({
+            "plan_id": plan.plan_id,
+            "canonical_sha256": plan.canonical_sha256,
+            "dataset_manifest_sha256": plan.dataset.manifest_sha256,
+            "runtime_variants": len(plan.runtime_matrix.variants),
+            "budget": asdict(plan.budget),
         }, sort_keys=True))
         return 0
     return 2
