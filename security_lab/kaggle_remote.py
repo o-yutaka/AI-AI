@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 import json
-from pathlib import Path
 import shutil
 import subprocess
 import time
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from pathlib import Path
 
 
 CommandRunner = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
