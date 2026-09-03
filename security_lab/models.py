@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class Split(str, Enum):
+class Split(StrEnum):
     TRAIN = "TRAIN"
     DEV = "DEV"
     HELD_OUT = "HELD_OUT"
     ADVERSARIAL_HELD_OUT = "ADVERSARIAL_HELD_OUT"
 
 
-class ProbeVerdict(str, Enum):
+class ProbeVerdict(StrEnum):
     SUPPORTED = "SUPPORTED"
     REFUTED = "REFUTED"
     INCONCLUSIVE = "INCONCLUSIVE"
