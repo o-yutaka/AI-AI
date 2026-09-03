@@ -1,3 +1,5 @@
+import pytest
+
 from security_lab import (
     BudgetLedger,
     EnvironmentIdentity,
@@ -55,7 +57,7 @@ def test_session_runs_and_records_hash_chained_provenance(tmp_path) -> None:
 def test_session_rejects_held_out_discovery() -> None:
     session = ResearchSession(BudgetLedger(allocate_budget(100)))
 
-    try:
+    with pytest.raises(ValueError, match="split leakage guard"):
         session.run(
             ResearchPurpose.DISCOVERY,
             [_case(Split.HELD_OUT)],
@@ -66,7 +68,3 @@ def test_session_rejects_held_out_discovery() -> None:
                 {},
             ),
         )
-    except ValueError as exc:
-        assert "split leakage guard" in str(exc)
-    else:
-        raise AssertionError("held-out discovery must be rejected")
