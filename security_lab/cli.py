@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import asdict
 from pathlib import Path
 
 from research_bundle.canonical import bundle_sha256, canonical_json
 from research_bundle.models import SecurityResearchBundle
+from .budget import allocate_budget
+from .candidate_pack import CandidateRecord, package_candidates
 from .compute import ComputeRequest, ComputeTarget, select_compute_target
+from .dataset import freeze_dataset
 from .manifest import ExperimentManifest
 
 
@@ -22,6 +26,12 @@ def main() -> int:
     fingerprint.add_argument("path")
     compute = subparsers.add_parser("select-compute")
     compute.add_argument("path", help="JSON containing request and targets")
+    freeze = subparsers.add_parser("freeze-dataset")
+    freeze.add_argument("path", help="JSON containing dataset_id, source_revision, instance_ids")
+    budget = subparsers.add_parser("plan-budget")
+    budget.add_argument("total_units", type=float)
+    package = subparsers.add_parser("package-candidates")
+    package.add_argument("path", help="JSON array of candidate records")
 
     args = parser.parse_args()
     if args.command in {"verify-bundle", "canonicalize-bundle"}:
@@ -42,6 +52,31 @@ def main() -> int:
         targets = [ComputeTarget(**item) for item in raw["targets"]]
         selected = select_compute_target(request, targets)
         print(json.dumps({"selected": selected.name}, sort_keys=True))
+        return 0
+    if args.command == "freeze-dataset":
+        raw = json.loads(Path(args.path).read_text(encoding="utf-8"))
+        frozen = freeze_dataset(raw["dataset_id"], raw["source_revision"], raw["instance_ids"])
+        print(json.dumps({
+            "dataset_id": frozen.dataset_id,
+            "source_revision": frozen.source_revision,
+            "manifest_sha256": frozen.manifest_sha256,
+            "instances": [
+                {"instance_id": item.instance_id, "split": item.split.value, "identity_hash": item.identity_hash}
+                for item in frozen.instances
+            ],
+        }, sort_keys=True))
+        return 0
+    if args.command == "plan-budget":
+        print(json.dumps(asdict(allocate_budget(args.total_units)), sort_keys=True))
+        return 0
+    if args.command == "package-candidates":
+        raw = json.loads(Path(args.path).read_text(encoding="utf-8"))
+        package_result = package_candidates(CandidateRecord(**item) for item in raw)
+        print(json.dumps({
+            "package_id": package_result.package_id,
+            "canonical_sha256": package_result.canonical_sha256,
+            "candidate_ids": [item.candidate_id for item in package_result.records],
+        }, sort_keys=True))
         return 0
     return 2
 
