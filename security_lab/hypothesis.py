@@ -30,21 +30,30 @@ def score_families(
 ) -> list[FamilyResult]:
     by_hypothesis: dict[str, list[Observation]] = defaultdict(list)
     for observation in observations:
-        hypothesis_id = observation.probe_id.split("::", 1)[0]
-        by_hypothesis[hypothesis_id].append(observation)
+        by_hypothesis[observation.probe_id.split("::", 1)[0]].append(observation)
 
     results: list[FamilyResult] = []
     for family_id, hypotheses in graph.by_family().items():
         family_observations: list[Observation] = []
         for hypothesis in hypotheses:
-            family_observations.extend(by_hypothesis.get(hypothesis.hypothesis_id, []))
-        weighted = sum(_verdict_weight(item.verdict) for item in family_observations)
+            family_observations.extend(
+                by_hypothesis.get(hypothesis.hypothesis_id, [])
+            )
+        weighted = sum(
+            _verdict_weight(item.verdict) for item in family_observations
+        )
         sample_count = len(family_observations)
         if sample_count == 0:
             support_score = 0.5
         else:
-            support_score = max(0.0, min(1.0, 0.5 + weighted / (2 * sample_count)))
-        eliminated = sample_count >= minimum_samples and support_score < eliminate_below
+            support_score = max(
+                0.0,
+                min(1.0, 0.5 + weighted / (2 * sample_count)),
+            )
+        eliminated = (
+            sample_count >= minimum_samples
+            and support_score < eliminate_below
+        )
         if sample_count < minimum_samples:
             reason = "insufficient_evidence"
         elif eliminated:
@@ -52,7 +61,13 @@ def score_families(
         else:
             reason = "survives"
         results.append(
-            FamilyResult(family_id, support_score, sample_count, eliminated, reason)
+            FamilyResult(
+                family_id,
+                support_score,
+                sample_count,
+                eliminated,
+                reason,
+            )
         )
     return sorted(results, key=lambda item: (-item.support_score, item.family_id))
 

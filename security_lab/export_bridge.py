@@ -2,16 +2,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from research_bundle.models import (
-    CompetitionIdentity,
-    ProvenanceRecord,
-    RobustnessResult,
-    SecurityResearchBundle,
-)
+from research_bundle.models import CompetitionIdentity, ProvenanceRecord
 from research_bundle.models import Finding as BundleFinding
 from research_bundle.models import Hypothesis as BundleHypothesis
 from research_bundle.models import Observation as BundleObservation
 from research_bundle.models import Probe as BundleProbe
+from research_bundle.models import RobustnessResult, SecurityResearchBundle
 from research_bundle.models import Trajectory as BundleTrajectory
 
 from .models import Hypothesis, Observation, Probe, ProbeVerdict, Trajectory
@@ -45,9 +41,7 @@ def build_research_bundle(
                 ),
                 evidence_refs=list(observation.evidence_refs),
                 scope="research_observation",
-                confidence=(
-                    1.0 if observation.verdict is ProbeVerdict.SUPPORTED else 0.75
-                ),
+                confidence=1.0 if observation.verdict is ProbeVerdict.SUPPORTED else 0.75,
             )
         )
 
