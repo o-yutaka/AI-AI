@@ -12,12 +12,14 @@ from .models import (
     Trajectory,
 )
 from .pipeline import ResearchDecision, rank_and_judge
+from .portfolio import CandidateProfile, select_diverse_portfolio
 from .probe import compile_minimal_falsification_probe, compile_probe
 from .replay import ReplayResult, replay_probe
 from .robustness import RobustnessEnvelope, RobustnessSample, build_robustness_envelope
 from .transfer import TransferEstimate, TransferPair, fit_linear_transfer
 
 __all__ = [
+    "CandidateProfile",
     "EnvironmentIdentity",
     "EvaluatorDimension",
     "EvaluatorSpec",
@@ -46,4 +48,5 @@ __all__ = [
     "rank_and_judge",
     "replay_probe",
     "score_families",
+    "select_diverse_portfolio",
 ]
