@@ -9,12 +9,23 @@ from .control_plane_bridge import ControlPlaneReplayAdapter
 from .dataset import FrozenDataset, FrozenInstance, freeze_dataset
 from .evaluator import EvaluatorDimension, EvaluatorSpec, decompose_evaluator
 from .export_bridge import build_research_bundle
+from .failure_correlation import (
+    FailureCorrelationGraph,
+    FailureProfile,
+    build_failure_correlation_graph,
+    select_correlation_diverse_portfolio,
+)
 from .freeze import CandidateFreeze, freeze_candidates
 from .hypothesis import HypothesisGraph, score_families
 from .judge import JudgeThresholds, JudgeVerdict, judge_family
 from .leakage import ResearchPurpose, assert_disjoint_instance_sets, assert_split_allowed
 from .ledger import LedgerRecord, append_record, load_records, verify_chain
 from .manifest import ExperimentManifest
+from .minimum_trace import (
+    MinimumWinningTrace,
+    TraceEvaluation,
+    minimize_winning_trace,
+)
 from .models import (
     EnvironmentIdentity,
     FamilyResult,
@@ -38,9 +49,20 @@ from .robustness import RobustnessEnvelope, RobustnessSample, build_robustness_e
 from .runner import ExperimentCase, ExperimentRun, run_cases
 from .runtime_matrix import RuntimeMatrix, RuntimeVariant, build_runtime_matrix
 from .session import ResearchSession
+from .target_gate import (
+    TargetReplayExpectation,
+    TargetReplayVerdict,
+    evaluate_target_replay,
+)
 from .telemetry import RuntimeTelemetry, measure_runtime
 from .throughput import ThroughputEstimate, estimate_throughput
-from .transfer import TransferEstimate, TransferPair, fit_linear_transfer
+from .transfer import (
+    RidgeTransferEstimate,
+    TransferEstimate,
+    TransferPair,
+    fit_linear_transfer,
+    fit_ridge_transfer,
+)
 
 __all__ = [
     "AttackPrimitive",
@@ -64,6 +86,8 @@ __all__ = [
     "ExperimentCase",
     "ExperimentManifest",
     "ExperimentRun",
+    "FailureCorrelationGraph",
+    "FailureProfile",
     "FamilyResult",
     "FrozenDataset",
     "FrozenInstance",
@@ -75,6 +99,7 @@ __all__ = [
     "JudgeVerdict",
     "KaggleAgentSecurityAdapter",
     "LedgerRecord",
+    "MinimumWinningTrace",
     "ModelCompiler",
     "Objective",
     "ObjectiveResult",
@@ -87,6 +112,7 @@ __all__ = [
     "ResearchPlan",
     "ResearchPurpose",
     "ResearchSession",
+    "RidgeTransferEstimate",
     "RobustnessEnvelope",
     "RobustnessSample",
     "RuntimeMatrix",
@@ -94,7 +120,10 @@ __all__ = [
     "RuntimeVariant",
     "Split",
     "SweepCase",
+    "TargetReplayExpectation",
+    "TargetReplayVerdict",
     "ThroughputEstimate",
+    "TraceEvaluation",
     "Trajectory",
     "TransferEstimate",
     "TransferPair",
@@ -103,6 +132,7 @@ __all__ = [
     "append_record",
     "assert_disjoint_instance_sets",
     "assert_split_allowed",
+    "build_failure_correlation_graph",
     "build_research_bundle",
     "build_research_plan",
     "build_robustness_envelope",
@@ -112,19 +142,23 @@ __all__ = [
     "compile_probe",
     "decompose_evaluator",
     "estimate_throughput",
+    "evaluate_target_replay",
     "fit_linear_transfer",
+    "fit_ridge_transfer",
     "freeze_candidates",
     "freeze_dataset",
     "initial_beliefs",
     "judge_family",
     "load_records",
     "measure_runtime",
+    "minimize_winning_trace",
     "package_candidates",
     "rank_and_judge",
     "replay_probe",
     "run_cases",
     "score_families",
     "select_compute_target",
+    "select_correlation_diverse_portfolio",
     "select_diverse_portfolio",
     "select_next_probe",
     "sha256_file",
