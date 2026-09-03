@@ -1,0 +1,9 @@
+{
+  "kernel_ref": "YOUR_KAGGLE_USER/your-security-lab-notebook",
+  "source_dir": "./kaggle/notebook",
+  "output_dir": "./artifacts/kaggle-output",
+  "cache_dir": ".kaggle-lab",
+  "mode": "reuse-only",
+  "poll_seconds": 15,
+  "timeout_seconds": 54000
+}
