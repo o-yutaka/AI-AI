@@ -10,6 +10,7 @@ from .export_bridge import build_research_bundle
 from .freeze import CandidateFreeze, freeze_candidates
 from .hypothesis import HypothesisGraph, score_families
 from .judge import JudgeThresholds, JudgeVerdict, judge_family
+from .ledger import LedgerRecord, append_record, load_records, verify_chain
 from .manifest import ExperimentManifest
 from .models import (
     EnvironmentIdentity,
@@ -66,6 +67,7 @@ __all__ = [
     "JudgeThresholds",
     "JudgeVerdict",
     "KaggleAgentSecurityAdapter",
+    "LedgerRecord",
     "ModelCompiler",
     "Objective",
     "ObjectiveResult",
@@ -89,6 +91,7 @@ __all__ = [
     "TransferPair",
     "WeightedObjective",
     "allocate_budget",
+    "append_record",
     "build_research_bundle",
     "build_research_plan",
     "build_robustness_envelope",
@@ -103,6 +106,7 @@ __all__ = [
     "freeze_dataset",
     "initial_beliefs",
     "judge_family",
+    "load_records",
     "measure_runtime",
     "package_candidates",
     "rank_and_judge",
@@ -115,5 +119,6 @@ __all__ = [
     "sha256_file",
     "stable_hash",
     "update_belief",
+    "verify_chain",
     "verify_expected_hash",
 ]
