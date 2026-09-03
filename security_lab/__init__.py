@@ -29,6 +29,7 @@ from .primitives import AttackPrimitive, CompositionKind, PrimitiveComposition
 from .probe import compile_minimal_falsification_probe, compile_probe
 from .replay import ReplayResult, replay_probe
 from .reproducibility import sha256_file, stable_hash, verify_expected_hash
+from .research_plan import ResearchPlan, build_research_plan
 from .robustness import RobustnessEnvelope, RobustnessSample, build_robustness_envelope
 from .runner import ExperimentCase, ExperimentRun, run_cases
 from .runtime_matrix import RuntimeMatrix, RuntimeVariant, build_runtime_matrix
@@ -74,6 +75,7 @@ __all__ = [
     "ProbeVerdict",
     "ReplayResult",
     "ResearchDecision",
+    "ResearchPlan",
     "RobustnessEnvelope",
     "RobustnessSample",
     "RuntimeMatrix",
@@ -88,6 +90,7 @@ __all__ = [
     "WeightedObjective",
     "allocate_budget",
     "build_research_bundle",
+    "build_research_plan",
     "build_robustness_envelope",
     "build_runtime_matrix",
     "build_sweep",
