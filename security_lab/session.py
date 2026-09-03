@@ -14,7 +14,6 @@ from .runner import (
     run_cases,
 )
 
-
 _STAGE_BY_PURPOSE: dict[ResearchPurpose, BudgetStage] = {
     ResearchPurpose.DISCOVERY: BudgetStage.EVALUATOR_IDENTIFICATION,
     ResearchPurpose.FALSIFICATION: BudgetStage.FALSIFICATION,
