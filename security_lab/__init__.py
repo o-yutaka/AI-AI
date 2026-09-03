@@ -37,6 +37,7 @@ from .research_plan import ResearchPlan, build_research_plan
 from .robustness import RobustnessEnvelope, RobustnessSample, build_robustness_envelope
 from .runner import ExperimentCase, ExperimentRun, run_cases
 from .runtime_matrix import RuntimeMatrix, RuntimeVariant, build_runtime_matrix
+from .session import ResearchSession
 from .telemetry import RuntimeTelemetry, measure_runtime
 from .throughput import ThroughputEstimate, estimate_throughput
 from .transfer import TransferEstimate, TransferPair, fit_linear_transfer
@@ -85,6 +86,7 @@ __all__ = [
     "ResearchDecision",
     "ResearchPlan",
     "ResearchPurpose",
+    "ResearchSession",
     "RobustnessEnvelope",
     "RobustnessSample",
     "RuntimeMatrix",
