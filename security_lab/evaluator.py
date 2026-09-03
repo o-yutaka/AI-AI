@@ -28,7 +28,17 @@ def decompose_evaluator(spec: EvaluatorSpec) -> tuple[EvaluatorDimension, ...]:
         EvaluatorDimension("parser", tuple(sorted(spec.parser_constraints))),
     ]
     if spec.time_budget_seconds is not None:
-        dimensions.append(EvaluatorDimension("time_budget", (f"seconds={spec.time_budget_seconds:g}",)))
+        dimensions.append(
+            EvaluatorDimension(
+                "time_budget",
+                (f"seconds={spec.time_budget_seconds:g}",),
+            )
+        )
     if spec.candidate_budget is not None:
-        dimensions.append(EvaluatorDimension("candidate_budget", (f"count={spec.candidate_budget}",)))
+        dimensions.append(
+            EvaluatorDimension(
+                "candidate_budget",
+                (f"count={spec.candidate_budget}",),
+            )
+        )
     return tuple(dimensions)
