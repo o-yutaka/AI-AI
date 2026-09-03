@@ -17,6 +17,7 @@ from .dataset import freeze_dataset
 from .kaggle_remote import KaggleRemoteRunner, KaggleRemoteSpec, stage_scratch_script
 from .manifest import ExperimentManifest
 from .research_plan import build_research_plan
+from .winning_io import rank_winning_portfolio_from_mapping, winning_strategy_result_payload
 
 
 def main() -> int:
@@ -37,6 +38,11 @@ def _register_commands(commands: argparse._SubParsersAction[argparse.ArgumentPar
     budget.add_argument("total_units", type=float)
     _path_command(commands, "package-candidates")
     _path_command(commands, "plan-research")
+    _path_command(
+        commands,
+        "rank-winning-portfolio",
+        help_text="JSON winning-strategy evidence specification",
+    )
     _path_command(commands, "kaggle-stage", help_text="JSON scratch-kernel specification")
     _path_command(commands, "kaggle-run", help_text="JSON remote-run specification")
     status = commands.add_parser("kaggle-status")
@@ -97,6 +103,10 @@ def _dispatch(args: argparse.Namespace) -> int:
         return 0
     if args.command == "plan-research":
         return _plan_research(args.path)
+    if args.command == "rank-winning-portfolio":
+        result = rank_winning_portfolio_from_mapping(_json_object(args.path))
+        _print_json(winning_strategy_result_payload(result))
+        return 0
     if args.command == "kaggle-stage":
         return _kaggle_stage(args.path)
     if args.command == "kaggle-run":
