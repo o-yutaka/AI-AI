@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kaggle-ai-agent-security-lab"
-version = "0.5.0"
+version = "0.6.0"
 description = "Independent Kaggle AI-agent tool-security research, replay, evaluation, and canonical evidence export lab"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -32,13 +32,12 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/o-yutaka/AI-AI"
-Repository = "https://github.com/o-yutaka/AI-AI"
-Documentation = "https://github.com/o-yutaka/AI-AI#readme"
-"Live Demo" = "https://raw.githack.com/o-yutaka/AI-AI/main/docs/live-demo.html"
+Homepage = "https://github.com/o-yutaka/kaggle-ai-agent-security-lab"
+Repository = "https://github.com/o-yutaka/kaggle-ai-agent-security-lab"
+Documentation = "https://github.com/o-yutaka/kaggle-ai-agent-security-lab#readme"
 
 [tool.setuptools.packages.find]
-include = ["control_plane*", "research_bundle*"]
+include = ["control_plane*", "research_bundle*", "security_lab*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
