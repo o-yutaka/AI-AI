@@ -26,6 +26,10 @@ class EnvironmentIdentity:
     quantization: str | None = None
     tool_surface_hash: str | None = None
     evaluator_hash: str | None = None
+    model_revision: str | None = None
+    runtime_version: str | None = None
+    tokenizer_revision: str | None = None
+    compiler_id: str | None = None
 
 
 @dataclass(frozen=True)
