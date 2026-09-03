@@ -110,10 +110,11 @@ def rank_winning_portfolio(
 
         minimum_trace: MinimumWinningTrace | None = None
         if trace_evaluator is not None and not reasons:
+            candidate_id = item.candidate_id
             try:
                 minimum_trace = minimize_winning_trace(
                     item.target_replay.trajectory,
-                    lambda steps: trace_evaluator(item.candidate_id, steps),
+                    lambda steps, bound_id=candidate_id: trace_evaluator(bound_id, steps),
                     minimum_prefix_steps=minimum_prefix_steps,
                 )
             except ValueError:
