@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class CompositionKind(str, Enum):
+class CompositionKind(StrEnum):
     SEQUENTIAL = "SEQUENTIAL"
     CONDITIONAL = "CONDITIONAL"
     SECOND_ORDER = "SECOND_ORDER"

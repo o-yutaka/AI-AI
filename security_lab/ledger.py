@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -57,7 +58,8 @@ def verify_chain(records: Iterable[LedgerRecord]) -> str | None:
     for record in records:
         if record.sequence != expected_sequence:
             raise ValueError(
-                f"ledger sequence mismatch: expected {expected_sequence}, got {record.sequence}"
+                "ledger sequence mismatch: "
+                f"expected {expected_sequence}, got {record.sequence}"
             )
         if record.previous_hash != previous:
             raise ValueError("ledger previous_hash mismatch")
@@ -74,7 +76,11 @@ def verify_chain(records: Iterable[LedgerRecord]) -> str | None:
     return previous
 
 
-def append_record(path: str | Path, record_type: str, payload: dict[str, Any]) -> LedgerRecord:
+def append_record(
+    path: str | Path,
+    record_type: str,
+    payload: dict[str, Any],
+) -> LedgerRecord:
     ledger_path = Path(path)
     existing = load_records(ledger_path) if ledger_path.exists() else []
     previous_hash = verify_chain(existing)
@@ -85,8 +91,9 @@ def append_record(path: str | Path, record_type: str, payload: dict[str, Any]) -
         previous_hash=previous_hash,
     )
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    serialized = json.dumps(asdict(record), sort_keys=True, ensure_ascii=False)
     with ledger_path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(asdict(record), sort_keys=True, ensure_ascii=False) + "\n")
+        handle.write(serialized + "\n")
     return record
 
 

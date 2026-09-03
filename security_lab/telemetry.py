@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from time import perf_counter
-from typing import Any, Callable
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -31,16 +32,31 @@ def measure_runtime(
     started = perf_counter()
     try:
         result = execute()
-        completed = True
-        outcome = "OK"
-        return result, RuntimeTelemetry(
-            run_id, model_id, compiler_id, (perf_counter() - started) * 1000,
-            None, None, completed, outcome, runtime_version, dict(metadata or {}),
+        telemetry = RuntimeTelemetry(
+            run_id=run_id,
+            model_id=model_id,
+            compiler_id=compiler_id,
+            duration_ms=(perf_counter() - started) * 1000,
+            input_units=None,
+            output_units=None,
+            completed=True,
+            outcome="OK",
+            runtime_version=runtime_version,
+            metadata=dict(metadata or {}),
         )
+        return result, telemetry
     except Exception as exc:
         telemetry = RuntimeTelemetry(
-            run_id, model_id, compiler_id, (perf_counter() - started) * 1000,
-            None, None, False, type(exc).__name__, runtime_version, dict(metadata or {}),
+            run_id=run_id,
+            model_id=model_id,
+            compiler_id=compiler_id,
+            duration_ms=(perf_counter() - started) * 1000,
+            input_units=None,
+            output_units=None,
+            completed=False,
+            outcome=type(exc).__name__,
+            runtime_version=runtime_version,
+            metadata=dict(metadata or {}),
         )
-        setattr(exc, "security_lab_telemetry", asdict(telemetry))
+        exc.security_lab_telemetry = asdict(telemetry)
         raise

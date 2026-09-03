@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from research_bundle.models import (
     CompetitionIdentity,
-    Finding as BundleFinding,
-    Hypothesis as BundleHypothesis,
-    Observation as BundleObservation,
-    Probe as BundleProbe,
     ProvenanceRecord,
     RobustnessResult,
     SecurityResearchBundle,
-    Trajectory as BundleTrajectory,
 )
+from research_bundle.models import Finding as BundleFinding
+from research_bundle.models import Hypothesis as BundleHypothesis
+from research_bundle.models import Observation as BundleObservation
+from research_bundle.models import Probe as BundleProbe
+from research_bundle.models import Trajectory as BundleTrajectory
 
 from .models import Hypothesis, Observation, Probe, ProbeVerdict, Trajectory
 from .robustness import RobustnessEnvelope
@@ -29,7 +29,7 @@ def build_research_bundle(
     robustness_by_family: dict[str, RobustnessEnvelope],
     generated_at: datetime | None = None,
 ) -> SecurityResearchBundle:
-    generated = generated_at or datetime.now(timezone.utc)
+    generated = generated_at or datetime.now(UTC)
     findings: list[BundleFinding] = []
     for observation in observations:
         if observation.verdict not in {ProbeVerdict.SUPPORTED, ProbeVerdict.REFUTED}:
@@ -39,10 +39,15 @@ def build_research_bundle(
             BundleFinding(
                 finding_id=f"finding::{observation.observation_id}",
                 family=family,
-                statement=f"probe {observation.probe_id} was {observation.verdict.value.lower()}",
+                statement=(
+                    f"probe {observation.probe_id} was "
+                    f"{observation.verdict.value.lower()}"
+                ),
                 evidence_refs=list(observation.evidence_refs),
                 scope="research_observation",
-                confidence=1.0 if observation.verdict is ProbeVerdict.SUPPORTED else 0.75,
+                confidence=(
+                    1.0 if observation.verdict is ProbeVerdict.SUPPORTED else 0.75
+                ),
             )
         )
 
@@ -53,7 +58,10 @@ def build_research_bundle(
             evaluation_scope="family",
             trials=envelope.sample_count,
             successes=round(envelope.success_rate * envelope.sample_count),
-            failures=envelope.sample_count - round(envelope.success_rate * envelope.sample_count),
+            failures=(
+                envelope.sample_count
+                - round(envelope.success_rate * envelope.sample_count)
+            ),
             metric_name="worst_score",
             metric_value=envelope.worst_score,
         )
@@ -101,7 +109,9 @@ def build_research_bundle(
             BundleTrajectory(
                 trajectory_id=item.trajectory_id,
                 run_id=item.probe_id,
-                ordered_event_refs=[f"step:{index}" for index, _ in enumerate(item.steps)],
+                ordered_event_refs=[
+                    f"step:{index}" for index, _ in enumerate(item.steps)
+                ],
                 outcome="UNKNOWN",
                 completion=item.completed,
             )

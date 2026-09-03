@@ -17,7 +17,10 @@ class CandidateProfile:
         return self.expected_score * self.survival_probability * self.throughput
 
 
-def select_diverse_portfolio(candidates: list[CandidateProfile], limit: int) -> list[CandidateProfile]:
+def select_diverse_portfolio(
+    candidates: list[CandidateProfile],
+    limit: int,
+) -> list[CandidateProfile]:
     if limit < 1:
         return []
     ranked = sorted(candidates, key=lambda item: (-item.expected_value, item.candidate_id))

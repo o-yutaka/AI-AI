@@ -25,21 +25,22 @@ def judge_family(
     robustness: RobustnessEnvelope,
     *,
     split: Split,
-    thresholds: JudgeThresholds = JudgeThresholds(),
+    thresholds: JudgeThresholds | None = None,
 ) -> JudgeVerdict:
+    active_thresholds = thresholds or JudgeThresholds()
     reasons: list[str] = []
     if split not in {Split.HELD_OUT, Split.ADVERSARIAL_HELD_OUT}:
         reasons.append("not_held_out")
-    if family.eliminated or family.support_score < thresholds.minimum_support_score:
+    if family.eliminated or family.support_score < active_thresholds.minimum_support_score:
         reasons.append("family_support_below_gate")
-    if robustness.success_rate < thresholds.minimum_success_rate:
+    if robustness.success_rate < active_thresholds.minimum_success_rate:
         reasons.append("robustness_success_rate_below_gate")
-    if robustness.worst_score < thresholds.minimum_worst_score:
+    if robustness.worst_score < active_thresholds.minimum_worst_score:
         reasons.append("worst_score_below_gate")
-    if thresholds.minimum_margin is not None:
+    if active_thresholds.minimum_margin is not None:
         if robustness.minimum_margin is None:
             reasons.append("margin_missing")
-        elif robustness.minimum_margin < thresholds.minimum_margin:
+        elif robustness.minimum_margin < active_thresholds.minimum_margin:
             reasons.append("minimum_margin_below_gate")
     if reasons:
         return JudgeVerdict("REJECTED", tuple(sorted(reasons)))

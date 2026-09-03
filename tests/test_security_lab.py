@@ -30,7 +30,12 @@ def test_replay_captures_observation_and_trajectory() -> None:
     environment = EnvironmentIdentity("model", "runtime")
 
     def executor(_probe):
-        return "signal", ProbeVerdict.SUPPORTED, [{"step": "observe"}], {"token_count": 4, "latency_ms": 2}
+        return (
+            "signal",
+            ProbeVerdict.SUPPORTED,
+            [{"step": "observe"}],
+            {"token_count": 4, "latency_ms": 2},
+        )
 
     replay = replay_probe(probe, environment, executor)
     assert replay.observation.verdict is ProbeVerdict.SUPPORTED
@@ -50,20 +55,27 @@ def test_family_elimination_and_held_out_judge() -> None:
         Observation("o3", "h2::a", "none", ProbeVerdict.REFUTED),
         Observation("o4", "h2::b", "none", ProbeVerdict.REFUTED),
     ]
-    families = {item.family_id: item for item in score_families(graph, observations)}
+    families = {
+        item.family_id: item for item in score_families(graph, observations)
+    }
     assert families["survivor"].eliminated is False
     assert families["drop"].eliminated is True
 
-    envelope = build_robustness_envelope([
-        RobustnessSample("c1", 1.0, True, 0.4),
-        RobustnessSample("c2", 0.9, True, 0.3),
-    ])
+    envelope = build_robustness_envelope(
+        [
+            RobustnessSample("c1", 1.0, True, 0.4),
+            RobustnessSample("c2", 0.9, True, 0.3),
+        ]
+    )
     decisions = rank_and_judge(
         hypotheses,
         observations,
         {"survivor": envelope, "drop": envelope},
         split=Split.HELD_OUT,
-        thresholds=JudgeThresholds(minimum_success_rate=1.0, minimum_margin=0.2),
+        thresholds=JudgeThresholds(
+            minimum_success_rate=1.0,
+            minimum_margin=0.2,
+        ),
     )
     by_family = {item.family.family_id: item for item in decisions}
     assert by_family["survivor"].judge.verdict == "VERIFIED_FOR_RESEARCH"
@@ -71,11 +83,13 @@ def test_family_elimination_and_held_out_judge() -> None:
 
 
 def test_transfer_calibrator_tracks_proxy_target_drift() -> None:
-    estimate = fit_linear_transfer([
-        TransferPair(0.0, 1.0),
-        TransferPair(1.0, 3.0),
-        TransferPair(2.0, 5.0),
-    ])
+    estimate = fit_linear_transfer(
+        [
+            TransferPair(0.0, 1.0),
+            TransferPair(1.0, 3.0),
+            TransferPair(2.0, 5.0),
+        ]
+    )
     assert round(estimate.slope, 6) == 2.0
     assert round(estimate.intercept, 6) == 1.0
     assert round(estimate.predict(3.0), 6) == 7.0
@@ -87,7 +101,9 @@ def test_non_held_out_never_verifies_for_research() -> None:
         Observation("o1", "h1::a", "signal", ProbeVerdict.SUPPORTED),
         Observation("o2", "h1::b", "signal", ProbeVerdict.SUPPORTED),
     ]
-    envelope = build_robustness_envelope([RobustnessSample("c1", 1.0, True, 0.5)])
+    envelope = build_robustness_envelope(
+        [RobustnessSample("c1", 1.0, True, 0.5)]
+    )
     decision = rank_and_judge(
         hypotheses,
         observations,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from hashlib import sha256
 import json
+from hashlib import sha256
 
 from .models import Hypothesis, Probe, Split
 
@@ -13,8 +13,14 @@ def compile_probe(
     split: Split = Split.DEV,
     budget_cost: float = 1.0,
 ) -> Probe:
-    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    digest = sha256(f"{hypothesis.hypothesis_id}\n{split.value}\n{canonical}".encode()).hexdigest()[:16]
+    canonical = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    identity = f"{hypothesis.hypothesis_id}\n{split.value}\n{canonical}".encode()
+    digest = sha256(identity).hexdigest()[:16]
     return Probe(
         probe_id=f"{hypothesis.hypothesis_id}::{digest}",
         hypothesis_id=hypothesis.hypothesis_id,
