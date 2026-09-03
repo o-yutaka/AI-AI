@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 from .budget import BudgetPlan
 
 
-class BudgetStage(str, Enum):
+class BudgetStage(StrEnum):
     EVALUATOR_IDENTIFICATION = "evaluator_identification"
     FALSIFICATION = "falsification"
     OPTIMIZATION = "optimization"
