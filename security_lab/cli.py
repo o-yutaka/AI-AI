@@ -13,6 +13,7 @@ from .candidate_pack import CandidateRecord, package_candidates
 from .competition import KaggleAgentSecurityAdapter
 from .compute import ComputeRequest, ComputeTarget, select_compute_target
 from .dataset import freeze_dataset
+from .kaggle_remote import KaggleRemoteRunner, KaggleRemoteSpec, stage_scratch_script
 from .manifest import ExperimentManifest
 from .research_plan import build_research_plan
 
@@ -30,137 +31,85 @@ def main() -> int:
     compute = subparsers.add_parser("select-compute")
     compute.add_argument("path", help="JSON containing request and targets")
     freeze = subparsers.add_parser("freeze-dataset")
-    freeze.add_argument(
-        "path",
-        help="JSON containing dataset_id, source_revision, instance_ids",
-    )
+    freeze.add_argument("path")
     budget = subparsers.add_parser("plan-budget")
     budget.add_argument("total_units", type=float)
     package = subparsers.add_parser("package-candidates")
-    package.add_argument("path", help="JSON array of candidate records")
+    package.add_argument("path")
     research = subparsers.add_parser("plan-research")
-    research.add_argument("path", help="JSON research-plan specification")
+    research.add_argument("path")
+    stage = subparsers.add_parser("kaggle-stage")
+    stage.add_argument("path", help="JSON scratch-kernel specification")
+    remote = subparsers.add_parser("kaggle-run")
+    remote.add_argument("path", help="JSON remote-run specification")
+    status = subparsers.add_parser("kaggle-status")
+    status.add_argument("kernel_ref")
+    output = subparsers.add_parser("kaggle-output")
+    output.add_argument("kernel_ref")
+    output.add_argument("destination")
 
     args = parser.parse_args()
     if args.command in {"verify-bundle", "canonicalize-bundle"}:
         bundle = _load_bundle(Path(args.path))
         if args.command == "verify-bundle":
-            print(
-                json.dumps(
-                    {
-                        "schema_version": bundle.schema_version,
-                        "sha256": bundle_sha256(bundle),
-                    },
-                    sort_keys=True,
-                )
-            )
+            print(json.dumps({"schema_version": bundle.schema_version, "sha256": bundle_sha256(bundle)}, sort_keys=True))
         else:
             print(canonical_json(bundle))
         return 0
     if args.command == "fingerprint-manifest":
-        raw = json.loads(Path(args.path).read_text(encoding="utf-8"))
+        raw = _json(args.path)
         manifest = ExperimentManifest(**raw)
-        print(
-            json.dumps(
-                {
-                    "experiment_id": manifest.experiment_id,
-                    "fingerprint": manifest.fingerprint(),
-                },
-                sort_keys=True,
-            )
-        )
+        print(json.dumps({"experiment_id": manifest.experiment_id, "fingerprint": manifest.fingerprint()}, sort_keys=True))
         return 0
     if args.command == "select-compute":
-        raw = json.loads(Path(args.path).read_text(encoding="utf-8"))
-        request = ComputeRequest(**raw["request"])
-        targets = [ComputeTarget(**item) for item in raw["targets"]]
-        selected = select_compute_target(request, targets)
+        raw = _json(args.path)
+        selected = select_compute_target(ComputeRequest(**raw["request"]), [ComputeTarget(**item) for item in raw["targets"]])
         print(json.dumps({"selected": selected.name}, sort_keys=True))
         return 0
     if args.command == "freeze-dataset":
-        raw = json.loads(Path(args.path).read_text(encoding="utf-8"))
-        frozen = freeze_dataset(
-            raw["dataset_id"],
-            raw["source_revision"],
-            raw["instance_ids"],
-        )
-        print(
-            json.dumps(
-                {
-                    "dataset_id": frozen.dataset_id,
-                    "source_revision": frozen.source_revision,
-                    "manifest_sha256": frozen.manifest_sha256,
-                    "instances": [
-                        {
-                            "instance_id": item.instance_id,
-                            "split": item.split.value,
-                            "identity_hash": item.identity_hash,
-                        }
-                        for item in frozen.instances
-                    ],
-                },
-                sort_keys=True,
-            )
-        )
+        raw = _json(args.path)
+        frozen = freeze_dataset(raw["dataset_id"], raw["source_revision"], raw["instance_ids"])
+        print(json.dumps({"dataset_id": frozen.dataset_id, "source_revision": frozen.source_revision, "manifest_sha256": frozen.manifest_sha256, "instances": [{"instance_id": item.instance_id, "split": item.split.value, "identity_hash": item.identity_hash} for item in frozen.instances]}, sort_keys=True))
         return 0
     if args.command == "plan-budget":
-        print(
-            json.dumps(
-                asdict(allocate_budget(args.total_units)),
-                sort_keys=True,
-            )
-        )
+        print(json.dumps(asdict(allocate_budget(args.total_units)), sort_keys=True))
         return 0
     if args.command == "package-candidates":
-        raw = json.loads(Path(args.path).read_text(encoding="utf-8"))
-        package_result = package_candidates(CandidateRecord(**item) for item in raw)
-        print(
-            json.dumps(
-                {
-                    "package_id": package_result.package_id,
-                    "canonical_sha256": package_result.canonical_sha256,
-                    "candidate_ids": [
-                        item.candidate_id for item in package_result.records
-                    ],
-                },
-                sort_keys=True,
-            )
-        )
+        package_result = package_candidates(CandidateRecord(**item) for item in _json(args.path))
+        print(json.dumps({"package_id": package_result.package_id, "canonical_sha256": package_result.canonical_sha256, "candidate_ids": [item.candidate_id for item in package_result.records]}, sort_keys=True))
         return 0
     if args.command == "plan-research":
-        raw = json.loads(Path(args.path).read_text(encoding="utf-8"))
-        competition = KaggleAgentSecurityAdapter().normalize(raw["competition"])
-        plan = build_research_plan(
-            competition=competition,
-            dataset_id=raw["dataset_id"],
-            source_revision=raw["source_revision"],
-            instance_ids=raw["instance_ids"],
-            total_budget_units=float(raw["total_budget_units"]),
-            model_ids=raw["model_ids"],
-            runtime_ids=raw["runtime_ids"],
-            compiler_ids=raw["compiler_ids"],
-            quantizations=raw["quantizations"],
-        )
-        print(
-            json.dumps(
-                {
-                    "plan_id": plan.plan_id,
-                    "canonical_sha256": plan.canonical_sha256,
-                    "dataset_manifest_sha256": plan.dataset.manifest_sha256,
-                    "runtime_variants": len(plan.runtime_matrix.variants),
-                    "budget": asdict(plan.budget),
-                },
-                sort_keys=True,
-            )
-        )
+        raw = _json(args.path)
+        plan = build_research_plan(competition=KaggleAgentSecurityAdapter().normalize(raw["competition"]), dataset_id=raw["dataset_id"], source_revision=raw["source_revision"], instance_ids=raw["instance_ids"], total_budget_units=float(raw["total_budget_units"]), model_ids=raw["model_ids"], runtime_ids=raw["runtime_ids"], compiler_ids=raw["compiler_ids"], quantizations=raw["quantizations"])
+        print(json.dumps({"plan_id": plan.plan_id, "canonical_sha256": plan.canonical_sha256, "dataset_manifest_sha256": plan.dataset.manifest_sha256, "runtime_variants": len(plan.runtime_matrix.variants), "budget": asdict(plan.budget)}, sort_keys=True))
+        return 0
+    if args.command == "kaggle-stage":
+        raw = _json(args.path)
+        source = Path(raw["source_file"]).read_text(encoding="utf-8")
+        root = stage_scratch_script(raw["destination"], kernel_ref=raw["kernel_ref"], title=raw["title"], source=source, competition_slug=raw.get("competition_slug"), enable_gpu=bool(raw.get("enable_gpu", True)), machine_shape=raw.get("machine_shape", "NvidiaTeslaT4"))
+        print(json.dumps({"staged": str(root)}, sort_keys=True))
+        return 0
+    if args.command == "kaggle-run":
+        raw = _json(args.path)
+        result = KaggleRemoteRunner().run(KaggleRemoteSpec(kernel_ref=raw["kernel_ref"], source_dir=Path(raw["source_dir"]), output_dir=Path(raw["output_dir"]), poll_seconds=float(raw.get("poll_seconds", 15)), timeout_seconds=float(raw.get("timeout_seconds", 54_000))))
+        print(json.dumps({"kernel_ref": result.kernel_ref, "status": result.status, "output_dir": str(result.output_dir), "output_files": result.output_files}, sort_keys=True))
+        return 0
+    if args.command == "kaggle-status":
+        print(json.dumps({"kernel_ref": args.kernel_ref, "status": KaggleRemoteRunner().status(args.kernel_ref)}, sort_keys=True))
+        return 0
+    if args.command == "kaggle-output":
+        files = KaggleRemoteRunner().output(args.kernel_ref, args.destination)
+        print(json.dumps({"kernel_ref": args.kernel_ref, "output_files": files}, sort_keys=True))
         return 0
     return 2
 
 
+def _json(path: str) -> object:
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
 def _load_bundle(path: Path) -> SecurityResearchBundle:
-    return SecurityResearchBundle.model_validate_json(
-        path.read_text(encoding="utf-8")
-    )
+    return SecurityResearchBundle.model_validate_json(path.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
