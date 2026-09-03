@@ -39,11 +39,6 @@ def stage_scratch_script(
     enable_gpu: bool = True,
     machine_shape: str = "NvidiaTeslaT4",
 ) -> Path:
-    """Create a minimal private Kaggle script kernel for one remote experiment.
-
-    This deliberately stages only the supplied source plus kernel metadata. It
-    does not copy BLACK state, secrets, or local runtime data into the kernel.
-    """
     root = Path(destination)
     root.mkdir(parents=True, exist_ok=True)
     script = root / "black_kaggle_task.py"
@@ -93,27 +88,7 @@ class KaggleRemoteRunner:
             time.sleep(spec.poll_seconds)
         else:
             raise TimeoutError(f"Kaggle kernel timed out: {spec.kernel_ref}")
-
-        spec.output_dir.mkdir(parents=True, exist_ok=True)
-        self._run(
-            [
-                "kaggle",
-                "kernels",
-                "output",
-                spec.kernel_ref,
-                "-p",
-                str(spec.output_dir),
-                "-o",
-                "-q",
-            ]
-        )
-        files = tuple(
-            sorted(
-                str(path.relative_to(spec.output_dir))
-                for path in spec.output_dir.rglob("*")
-                if path.is_file()
-            )
-        )
+        files = self.output(spec.kernel_ref, spec.output_dir)
         return KaggleRemoteResult(spec.kernel_ref, status, spec.output_dir, files)
 
     def status(self, kernel_ref: str) -> str:
@@ -134,25 +109,36 @@ class KaggleRemoteRunner:
         self._require_cli()
         output_dir = Path(destination)
         output_dir.mkdir(parents=True, exist_ok=True)
-        self._run(
-            [
-                "kaggle",
-                "kernels",
-                "output",
-                kernel_ref,
-                "-p",
-                str(output_dir),
-                "-o",
-                "-q",
-            ]
-        )
-        return tuple(
-            sorted(
-                str(path.relative_to(output_dir))
-                for path in output_dir.rglob("*")
-                if path.is_file()
-            )
-        )
+        self._run(["kaggle", "kernels", "output", kernel_ref, "-p", str(output_dir), "-o", "-q"])
+        return tuple(sorted(str(path.relative_to(output_dir)) for path in output_dir.rglob("*") if path.is_file()))
+
+    def submit(
+        self,
+        *,
+        competition_slug: str,
+        kernel_ref: str,
+        output_file: str,
+        message: str,
+        version: int | None = None,
+    ) -> str:
+        """Explicitly submit one completed kernel output. Never called by run()."""
+        self._require_cli()
+        command = [
+            "kaggle",
+            "competitions",
+            "submit",
+            competition_slug,
+            "-k",
+            kernel_ref,
+            "-f",
+            output_file,
+            "-m",
+            message,
+        ]
+        if version is not None:
+            command.extend(["-v", str(version)])
+        completed = self._run(command)
+        return completed.stdout.strip()
 
     @staticmethod
     def _require_cli() -> None:
@@ -161,9 +147,4 @@ class KaggleRemoteRunner:
 
 
 def _run_command(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        list(command),
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    return subprocess.run(list(command), check=True, capture_output=True, text=True)
