@@ -30,8 +30,26 @@ def test_dataset_freeze_is_deterministic_and_disjoint() -> None:
 
 
 def test_candidate_package_is_order_independent() -> None:
-    a = CandidateRecord("a", "family-a", "generic-chat.v1", "0" * 64, "cluster-a", 1.0, 0.8, 10.0)
-    b = CandidateRecord("b", "family-b", "generic-chat.v1", "1" * 64, "cluster-b", 0.9, 0.9, 12.0)
+    a = CandidateRecord(
+        "a",
+        "family-a",
+        "generic-chat.v1",
+        "0" * 64,
+        "cluster-a",
+        1.0,
+        0.8,
+        10.0,
+    )
+    b = CandidateRecord(
+        "b",
+        "family-b",
+        "generic-chat.v1",
+        "1" * 64,
+        "cluster-b",
+        0.9,
+        0.9,
+        12.0,
+    )
     assert package_candidates([a, b]) == package_candidates([b, a])
 
 
@@ -66,4 +84,6 @@ def test_runner_binds_split_and_environment_to_replay() -> None:
     run = runs[0]
     assert run.probe.split is Split.HELD_OUT
     assert run.replay.trajectory.environment == environment
-    assert run.replay.observation.evidence_refs == (run.replay.trajectory.trajectory_id,)
+    assert run.replay.observation.evidence_refs == (
+        run.replay.trajectory.trajectory_id,
+    )
