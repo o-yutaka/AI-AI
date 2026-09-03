@@ -55,7 +55,7 @@ def stage_scratch_script(
     title: str,
     source: str,
     competition_slug: str | None = None,
-    enable_gpu: bool = True,
+    enable_gpu: bool = False,
     machine_shape: str = "NvidiaTeslaT4",
 ) -> pathlib.Path:
     root = pathlib.Path(destination)
@@ -95,12 +95,12 @@ class KaggleRemoteRunner:
 
     def run(self, spec: KaggleRemoteSpec) -> KaggleRemoteResult:
         """Return matching output first; execute only for explicit cpu/gpu modes."""
-        self._require_cli()
         fingerprint = workspace_fingerprint(spec.source_dir)
         cached = self._cached_result(spec, fingerprint)
         if cached is not None:
             return cached
 
+        self._require_cli()
         if spec.mode is KaggleRunMode.REUSE_ONLY:
             files = self.output(spec.kernel_ref, spec.output_dir)
             verified = marker_matches(spec.output_dir, fingerprint)
@@ -369,7 +369,10 @@ def _inject_notebook_marker(path: pathlib.Path, fingerprint: str) -> None:
 
 def _inject_script_marker(path: pathlib.Path, fingerprint: str) -> None:
     source = path.read_text(encoding="utf-8")
-    path.write_text(source.rstrip() + "\n\n" + "".join(_marker_source(fingerprint)), encoding="utf-8")
+    path.write_text(
+        source.rstrip() + "\n\n" + "".join(_marker_source(fingerprint)),
+        encoding="utf-8",
+    )
 
 
 def _marker_source(fingerprint: str) -> list[str]:
