@@ -31,6 +31,9 @@ dev = [
   "ruff>=0.6,<1.0",
 ]
 
+[project.scripts]
+kaggle-security-lab = "security_lab.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/o-yutaka/kaggle-ai-agent-security-lab"
 Repository = "https://github.com/o-yutaka/kaggle-ai-agent-security-lab"
