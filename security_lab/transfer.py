@@ -23,13 +23,27 @@ class TransferEstimate:
 
 def fit_linear_transfer(pairs: list[TransferPair]) -> TransferEstimate:
     if len(pairs) < 2:
-        raise ValueError("transfer calibration requires at least two proxy/target pairs")
+        raise ValueError(
+            "transfer calibration requires at least two proxy/target pairs"
+        )
     xs = [item.proxy_score for item in pairs]
     ys = [item.target_score for item in pairs]
     x_bar = mean(xs)
     y_bar = mean(ys)
     variance = sum((x - x_bar) ** 2 for x in xs)
-    slope = 0.0 if variance == 0 else sum((x - x_bar) * (y - y_bar) for x, y in zip(xs, ys, strict=True)) / variance
+    covariance = sum(
+        (x - x_bar) * (y - y_bar)
+        for x, y in zip(xs, ys, strict=True)
+    )
+    slope = 0.0 if variance == 0 else covariance / variance
     intercept = y_bar - slope * x_bar
-    residuals = [abs((intercept + slope * x) - y) for x, y in zip(xs, ys, strict=True)]
-    return TransferEstimate(slope=slope, intercept=intercept, residual_mae=mean(residuals), sample_count=len(pairs))
+    residuals = [
+        abs((intercept + slope * x) - y)
+        for x, y in zip(xs, ys, strict=True)
+    ]
+    return TransferEstimate(
+        slope=slope,
+        intercept=intercept,
+        residual_mae=mean(residuals),
+        sample_count=len(pairs),
+    )
