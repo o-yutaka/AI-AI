@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 import json
+from pathlib import Path
 import shutil
 import subprocess
 import time
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
-from pathlib import Path
 
 
 CommandRunner = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
@@ -109,8 +109,24 @@ class KaggleRemoteRunner:
         self._require_cli()
         output_dir = Path(destination)
         output_dir.mkdir(parents=True, exist_ok=True)
-        self._run(["kaggle", "kernels", "output", kernel_ref, "-p", str(output_dir), "-o", "-q"])
-        return tuple(sorted(str(path.relative_to(output_dir)) for path in output_dir.rglob("*") if path.is_file()))
+        self._run(
+            [
+                "kaggle",
+                "kernels",
+                "output",
+                kernel_ref,
+                "-p",
+                str(output_dir),
+                "-o",
+                "-q",
+            ]
+        )
+        files = (
+            str(path.relative_to(output_dir))
+            for path in output_dir.rglob("*")
+            if path.is_file()
+        )
+        return tuple(sorted(files))
 
     def submit(
         self,
