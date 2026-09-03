@@ -1,0 +1,31 @@
+{
+  "competition": {
+    "slug": "ai-agent-security-multi-step-tool-attacks",
+    "name": "AI Agent Security - Multi-Step Tool Attacks",
+    "evaluator_version": "unknown",
+    "tool_schema": {},
+    "time_budget_seconds": null,
+    "internet_enabled": false
+  },
+  "dataset_id": "replace-with-dataset-id",
+  "source_revision": "replace-with-source-revision",
+  "instance_ids": [
+    "instance-001",
+    "instance-002",
+    "instance-003",
+    "instance-004"
+  ],
+  "total_budget_units": 100,
+  "model_ids": [
+    "replace-with-model-id"
+  ],
+  "runtime_ids": [
+    "replace-with-runtime-id"
+  ],
+  "compiler_ids": [
+    "generic-chat.v1"
+  ],
+  "quantizations": [
+    "bf16"
+  ]
+}
