@@ -1,5 +1,6 @@
 from .belief import HypothesisBelief, initial_beliefs, select_next_probe, update_belief
 from .budget import BudgetPlan, allocate_budget
+from .budget_ledger import BudgetLedger, BudgetStage
 from .candidate_pack import CandidatePackage, CandidateRecord, package_candidates
 from .competition import CompetitionAdapter, CompetitionSpec, KaggleAgentSecurityAdapter
 from .compiler import CompiledRequest, GenericChatCompiler, ModelCompiler
@@ -10,6 +11,7 @@ from .export_bridge import build_research_bundle
 from .freeze import CandidateFreeze, freeze_candidates
 from .hypothesis import HypothesisGraph, score_families
 from .judge import JudgeThresholds, JudgeVerdict, judge_family
+from .leakage import ResearchPurpose, assert_disjoint_instance_sets, assert_split_allowed
 from .ledger import LedgerRecord, append_record, load_records, verify_chain
 from .manifest import ExperimentManifest
 from .models import (
@@ -40,7 +42,9 @@ from .transfer import TransferEstimate, TransferPair, fit_linear_transfer
 
 __all__ = [
     "AttackPrimitive",
+    "BudgetLedger",
     "BudgetPlan",
+    "BudgetStage",
     "CandidateFreeze",
     "CandidatePackage",
     "CandidateProfile",
@@ -78,6 +82,7 @@ __all__ = [
     "ReplayResult",
     "ResearchDecision",
     "ResearchPlan",
+    "ResearchPurpose",
     "RobustnessEnvelope",
     "RobustnessSample",
     "RuntimeMatrix",
@@ -92,6 +97,8 @@ __all__ = [
     "WeightedObjective",
     "allocate_budget",
     "append_record",
+    "assert_disjoint_instance_sets",
+    "assert_split_allowed",
     "build_research_bundle",
     "build_research_plan",
     "build_robustness_envelope",
