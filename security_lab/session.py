@@ -7,7 +7,12 @@ from pathlib import Path
 from .budget_ledger import BudgetLedger, BudgetStage
 from .leakage import ResearchPurpose, assert_split_allowed
 from .ledger import append_record
-from .runner import CaseExecutor, ExperimentCase, ExperimentRun, run_cases
+from .runner import (
+    CaseExecutor,
+    ExperimentCase,
+    ExperimentRun,
+    run_cases,
+)
 
 
 _STAGE_BY_PURPOSE: dict[ResearchPurpose, BudgetStage] = {
