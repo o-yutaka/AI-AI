@@ -4,21 +4,41 @@ This layer turns the strongest transferable competition lessons into reusable,
 BLACK-independent research primitives. It deliberately avoids hard-coding one
 attack family, one model, or one evaluator implementation.
 
-## New gates
+## Research flow
 
 ```text
-proxy observation
+semantic genome warm start
+  -> deterministic beam search
+  -> proxy observation
   -> ridge proxy→target calibration
+  -> runtime-sensitivity analysis
   -> exact target-runtime replay gate
   -> minimum winning trace reduction
+  -> throughput / robustness measurement
   -> failure-correlation-aware portfolio selection
 ```
+
+### Semantic genome + search
+
+`SemanticGenome` represents instruction wording, clause order, protocol examples,
+layout, and termination as explicit genes. The identity hash changes when gene
+text, enablement, or order changes. `beam_search_semantic_genomes()` evaluates a
+caller-owned mutation neighborhood with deterministic deduplication and tie
+breaking, so semantic evolutionary warm starts are reproducible instead of
+being hidden prompt edits.
 
 ### Ridge transfer calibration
 
 `fit_ridge_transfer()` models systematic proxy→target drift while shrinking an
 unstable slope. `residual_max` is retained so callers can rank candidates by a
 conservative target-side lower bound instead of a raw proxy score.
+
+### Runtime sensitivity
+
+`analyze_runtime_sensitivity()` measures success-rate loss and score spread
+across explicit `RuntimeVariant` identities. Runtime/compiler/quantization drift
+is therefore a first-class research signal rather than noise folded into one
+aggregate score.
 
 ### Exact target replay
 
