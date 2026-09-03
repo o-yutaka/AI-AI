@@ -14,7 +14,12 @@ from .candidate_pack import CandidateRecord, package_candidates
 from .competition import KaggleAgentSecurityAdapter
 from .compute import ComputeRequest, ComputeTarget, select_compute_target
 from .dataset import freeze_dataset
-from .kaggle_remote import KaggleRemoteRunner, KaggleRemoteSpec, stage_scratch_script
+from .kaggle_remote import (
+    KaggleRemoteRunner,
+    KaggleRemoteSpec,
+    KaggleRunMode,
+    stage_scratch_script,
+)
 from .manifest import ExperimentManifest
 from .research_plan import build_research_plan
 
@@ -38,7 +43,11 @@ def _register_commands(commands: argparse._SubParsersAction[argparse.ArgumentPar
     _path_command(commands, "package-candidates")
     _path_command(commands, "plan-research")
     _path_command(commands, "kaggle-stage", help_text="JSON scratch-kernel specification")
-    _path_command(commands, "kaggle-run", help_text="JSON remote-run specification")
+    _path_command(
+        commands,
+        "kaggle-run",
+        help_text="JSON output-first remote specification; mode defaults to reuse-only",
+    )
     status = commands.add_parser("kaggle-status")
     status.add_argument("kernel_ref")
     output = commands.add_parser("kaggle-output")
@@ -191,7 +200,7 @@ def _kaggle_stage(path: str) -> int:
         title=str(raw["title"]),
         source=source,
         competition_slug=_optional_str(raw.get("competition_slug")),
-        enable_gpu=bool(raw.get("enable_gpu", True)),
+        enable_gpu=bool(raw.get("enable_gpu", False)),
         machine_shape=str(raw.get("machine_shape", "NvidiaTeslaT4")),
     )
     _print_json({"staged": str(root)})
@@ -200,11 +209,14 @@ def _kaggle_stage(path: str) -> int:
 
 def _kaggle_run(path: str) -> int:
     raw = _json_object(path)
+    mode = KaggleRunMode(str(raw.get("mode", KaggleRunMode.REUSE_ONLY.value)))
     result = KaggleRemoteRunner().run(
         KaggleRemoteSpec(
             kernel_ref=str(raw["kernel_ref"]),
             source_dir=Path(str(raw["source_dir"])),
             output_dir=Path(str(raw["output_dir"])),
+            cache_dir=Path(str(raw.get("cache_dir", ".kaggle-lab"))),
+            mode=mode,
             poll_seconds=float(raw.get("poll_seconds", 15)),
             timeout_seconds=float(raw.get("timeout_seconds", 54_000)),
         )
@@ -215,6 +227,11 @@ def _kaggle_run(path: str) -> int:
             "status": result.status,
             "output_dir": str(result.output_dir),
             "output_files": result.output_files,
+            "job_fingerprint": result.job_fingerprint,
+            "output_sha256": result.output_sha256,
+            "source": result.source,
+            "executed": result.executed,
+            "verified_fingerprint": result.verified_fingerprint,
         }
     )
     return 0
