@@ -13,7 +13,10 @@ class HypothesisBelief:
 
 def initial_beliefs(hypotheses: list[Hypothesis]) -> dict[str, HypothesisBelief]:
     return {
-        item.hypothesis_id: HypothesisBelief(item.hypothesis_id, _clamp_probability(item.prior))
+        item.hypothesis_id: HypothesisBelief(
+            item.hypothesis_id,
+            _clamp_probability(item.prior),
+        )
         for item in hypotheses
     }
 
@@ -51,7 +54,8 @@ def select_next_probe(
         return None
 
     def priority(probe: Probe) -> tuple[float, str]:
-        probability = beliefs.get(probe.hypothesis_id, HypothesisBelief(probe.hypothesis_id, 0.5)).probability
+        fallback = HypothesisBelief(probe.hypothesis_id, 0.5)
+        probability = beliefs.get(probe.hypothesis_id, fallback).probability
         uncertainty = 1.0 - abs(2.0 * probability - 1.0)
         cost = max(probe.budget_cost, 1e-9)
         return (-(uncertainty / cost), probe.probe_id)
