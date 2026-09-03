@@ -7,6 +7,7 @@ from pathlib import Path
 
 from research_bundle.canonical import bundle_sha256, canonical_json
 from research_bundle.models import SecurityResearchBundle
+
 from .budget import allocate_budget
 from .candidate_pack import CandidateRecord, package_candidates
 from .competition import KaggleAgentSecurityAdapter
@@ -29,7 +30,10 @@ def main() -> int:
     compute = subparsers.add_parser("select-compute")
     compute.add_argument("path", help="JSON containing request and targets")
     freeze = subparsers.add_parser("freeze-dataset")
-    freeze.add_argument("path", help="JSON containing dataset_id, source_revision, instance_ids")
+    freeze.add_argument(
+        "path",
+        help="JSON containing dataset_id, source_revision, instance_ids",
+    )
     budget = subparsers.add_parser("plan-budget")
     budget.add_argument("total_units", type=float)
     package = subparsers.add_parser("package-candidates")
@@ -41,14 +45,30 @@ def main() -> int:
     if args.command in {"verify-bundle", "canonicalize-bundle"}:
         bundle = _load_bundle(Path(args.path))
         if args.command == "verify-bundle":
-            print(json.dumps({"schema_version": bundle.schema_version, "sha256": bundle_sha256(bundle)}, sort_keys=True))
+            print(
+                json.dumps(
+                    {
+                        "schema_version": bundle.schema_version,
+                        "sha256": bundle_sha256(bundle),
+                    },
+                    sort_keys=True,
+                )
+            )
         else:
             print(canonical_json(bundle))
         return 0
     if args.command == "fingerprint-manifest":
         raw = json.loads(Path(args.path).read_text(encoding="utf-8"))
         manifest = ExperimentManifest(**raw)
-        print(json.dumps({"experiment_id": manifest.experiment_id, "fingerprint": manifest.fingerprint()}, sort_keys=True))
+        print(
+            json.dumps(
+                {
+                    "experiment_id": manifest.experiment_id,
+                    "fingerprint": manifest.fingerprint(),
+                },
+                sort_keys=True,
+            )
+        )
         return 0
     if args.command == "select-compute":
         raw = json.loads(Path(args.path).read_text(encoding="utf-8"))
@@ -59,28 +79,53 @@ def main() -> int:
         return 0
     if args.command == "freeze-dataset":
         raw = json.loads(Path(args.path).read_text(encoding="utf-8"))
-        frozen = freeze_dataset(raw["dataset_id"], raw["source_revision"], raw["instance_ids"])
-        print(json.dumps({
-            "dataset_id": frozen.dataset_id,
-            "source_revision": frozen.source_revision,
-            "manifest_sha256": frozen.manifest_sha256,
-            "instances": [
-                {"instance_id": item.instance_id, "split": item.split.value, "identity_hash": item.identity_hash}
-                for item in frozen.instances
-            ],
-        }, sort_keys=True))
+        frozen = freeze_dataset(
+            raw["dataset_id"],
+            raw["source_revision"],
+            raw["instance_ids"],
+        )
+        print(
+            json.dumps(
+                {
+                    "dataset_id": frozen.dataset_id,
+                    "source_revision": frozen.source_revision,
+                    "manifest_sha256": frozen.manifest_sha256,
+                    "instances": [
+                        {
+                            "instance_id": item.instance_id,
+                            "split": item.split.value,
+                            "identity_hash": item.identity_hash,
+                        }
+                        for item in frozen.instances
+                    ],
+                },
+                sort_keys=True,
+            )
+        )
         return 0
     if args.command == "plan-budget":
-        print(json.dumps(asdict(allocate_budget(args.total_units)), sort_keys=True))
+        print(
+            json.dumps(
+                asdict(allocate_budget(args.total_units)),
+                sort_keys=True,
+            )
+        )
         return 0
     if args.command == "package-candidates":
         raw = json.loads(Path(args.path).read_text(encoding="utf-8"))
         package_result = package_candidates(CandidateRecord(**item) for item in raw)
-        print(json.dumps({
-            "package_id": package_result.package_id,
-            "canonical_sha256": package_result.canonical_sha256,
-            "candidate_ids": [item.candidate_id for item in package_result.records],
-        }, sort_keys=True))
+        print(
+            json.dumps(
+                {
+                    "package_id": package_result.package_id,
+                    "canonical_sha256": package_result.canonical_sha256,
+                    "candidate_ids": [
+                        item.candidate_id for item in package_result.records
+                    ],
+                },
+                sort_keys=True,
+            )
+        )
         return 0
     if args.command == "plan-research":
         raw = json.loads(Path(args.path).read_text(encoding="utf-8"))
@@ -96,19 +141,26 @@ def main() -> int:
             compiler_ids=raw["compiler_ids"],
             quantizations=raw["quantizations"],
         )
-        print(json.dumps({
-            "plan_id": plan.plan_id,
-            "canonical_sha256": plan.canonical_sha256,
-            "dataset_manifest_sha256": plan.dataset.manifest_sha256,
-            "runtime_variants": len(plan.runtime_matrix.variants),
-            "budget": asdict(plan.budget),
-        }, sort_keys=True))
+        print(
+            json.dumps(
+                {
+                    "plan_id": plan.plan_id,
+                    "canonical_sha256": plan.canonical_sha256,
+                    "dataset_manifest_sha256": plan.dataset.manifest_sha256,
+                    "runtime_variants": len(plan.runtime_matrix.variants),
+                    "budget": asdict(plan.budget),
+                },
+                sort_keys=True,
+            )
+        )
         return 0
     return 2
 
 
 def _load_bundle(path: Path) -> SecurityResearchBundle:
-    return SecurityResearchBundle.model_validate_json(path.read_text(encoding="utf-8"))
+    return SecurityResearchBundle.model_validate_json(
+        path.read_text(encoding="utf-8")
+    )
 
 
 if __name__ == "__main__":
