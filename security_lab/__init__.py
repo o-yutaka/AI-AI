@@ -5,6 +5,7 @@ from .candidate_pack import CandidatePackage, CandidateRecord, package_candidate
 from .competition import CompetitionAdapter, CompetitionSpec, KaggleAgentSecurityAdapter
 from .compiler import CompiledRequest, GenericChatCompiler, ModelCompiler
 from .compute import ComputeRequest, ComputeTarget, select_compute_target
+from .control_plane_bridge import ControlPlaneReplayAdapter
 from .dataset import FrozenDataset, FrozenInstance, freeze_dataset
 from .evaluator import EvaluatorDimension, EvaluatorSpec, decompose_evaluator
 from .export_bridge import build_research_bundle
@@ -55,6 +56,7 @@ __all__ = [
     "CompositionKind",
     "ComputeRequest",
     "ComputeTarget",
+    "ControlPlaneReplayAdapter",
     "EnvironmentIdentity",
     "EvaluatorDimension",
     "EvaluatorSpec",
