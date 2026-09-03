@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -53,11 +54,11 @@ def make_record(
 
 def verify_chain(records: Iterable[LedgerRecord]) -> str | None:
     previous: str | None = None
-    expected_sequence = 0
-    for record in records:
+    for expected_sequence, record in enumerate(records):
         if record.sequence != expected_sequence:
             raise ValueError(
-                f"ledger sequence mismatch: expected {expected_sequence}, got {record.sequence}"
+                f"ledger sequence mismatch: expected {expected_sequence}, "
+                f"got {record.sequence}"
             )
         if record.previous_hash != previous:
             raise ValueError("ledger previous_hash mismatch")
@@ -70,11 +71,14 @@ def verify_chain(records: Iterable[LedgerRecord]) -> str | None:
         if record.record_hash != expected:
             raise ValueError("ledger record hash mismatch")
         previous = record.record_hash
-        expected_sequence += 1
     return previous
 
 
-def append_record(path: str | Path, record_type: str, payload: dict[str, Any]) -> LedgerRecord:
+def append_record(
+    path: str | Path,
+    record_type: str,
+    payload: dict[str, Any],
+) -> LedgerRecord:
     ledger_path = Path(path)
     existing = load_records(ledger_path) if ledger_path.exists() else []
     previous_hash = verify_chain(existing)
@@ -86,7 +90,9 @@ def append_record(path: str | Path, record_type: str, payload: dict[str, Any]) -
     )
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     with ledger_path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(asdict(record), sort_keys=True, ensure_ascii=False) + "\n")
+        handle.write(
+            json.dumps(asdict(record), sort_keys=True, ensure_ascii=False) + "\n"
+        )
     return record
 
 
