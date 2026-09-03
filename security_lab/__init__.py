@@ -48,6 +48,27 @@ from .research_plan import ResearchPlan, build_research_plan
 from .robustness import RobustnessEnvelope, RobustnessSample, build_robustness_envelope
 from .runner import ExperimentCase, ExperimentRun, run_cases
 from .runtime_matrix import RuntimeMatrix, RuntimeVariant, build_runtime_matrix
+from .runtime_sensitivity import (
+    RuntimeOutcome,
+    RuntimeSensitivityReport,
+    analyze_runtime_sensitivity,
+    runtime_variant_key,
+)
+from .semantic_genome import (
+    GeneSlot,
+    SemanticGene,
+    SemanticGenome,
+    build_replacement_neighborhood,
+    reorder_genes,
+    replace_gene_text,
+    toggle_gene,
+)
+from .semantic_search import (
+    SemanticScore,
+    SemanticSearchCandidate,
+    SemanticSearchResult,
+    beam_search_semantic_genomes,
+)
 from .session import ResearchSession
 from .target_gate import (
     TargetReplayExpectation,
@@ -91,6 +112,7 @@ __all__ = [
     "FamilyResult",
     "FrozenDataset",
     "FrozenInstance",
+    "GeneSlot",
     "GenericChatCompiler",
     "Hypothesis",
     "HypothesisBelief",
@@ -116,8 +138,15 @@ __all__ = [
     "RobustnessEnvelope",
     "RobustnessSample",
     "RuntimeMatrix",
+    "RuntimeOutcome",
+    "RuntimeSensitivityReport",
     "RuntimeTelemetry",
     "RuntimeVariant",
+    "SemanticGene",
+    "SemanticGenome",
+    "SemanticScore",
+    "SemanticSearchCandidate",
+    "SemanticSearchResult",
     "Split",
     "SweepCase",
     "TargetReplayExpectation",
@@ -129,10 +158,13 @@ __all__ = [
     "TransferPair",
     "WeightedObjective",
     "allocate_budget",
+    "analyze_runtime_sensitivity",
     "append_record",
     "assert_disjoint_instance_sets",
     "assert_split_allowed",
+    "beam_search_semantic_genomes",
     "build_failure_correlation_graph",
+    "build_replacement_neighborhood",
     "build_research_bundle",
     "build_research_plan",
     "build_robustness_envelope",
@@ -154,8 +186,11 @@ __all__ = [
     "minimize_winning_trace",
     "package_candidates",
     "rank_and_judge",
+    "reorder_genes",
+    "replace_gene_text",
     "replay_probe",
     "run_cases",
+    "runtime_variant_key",
     "score_families",
     "select_compute_target",
     "select_correlation_diverse_portfolio",
@@ -163,6 +198,7 @@ __all__ = [
     "select_next_probe",
     "sha256_file",
     "stable_hash",
+    "toggle_gene",
     "update_belief",
     "verify_chain",
     "verify_expected_hash",
