@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 
 @dataclass(frozen=True)
@@ -19,14 +19,20 @@ class ComputeRequest:
     estimated_minutes: int
 
 
-def select_compute_target(request: ComputeRequest, targets: Iterable[ComputeTarget]) -> ComputeTarget:
+def select_compute_target(
+    request: ComputeRequest,
+    targets: Iterable[ComputeTarget],
+) -> ComputeTarget:
     eligible: list[ComputeTarget] = []
     for target in targets:
         if not target.available:
             continue
         if target.vram_gb is not None and target.vram_gb < request.required_vram_gb:
             continue
-        if target.remaining_minutes is not None and target.remaining_minutes < request.estimated_minutes:
+        if (
+            target.remaining_minutes is not None
+            and target.remaining_minutes < request.estimated_minutes
+        ):
             continue
         eligible.append(target)
     if not eligible:
