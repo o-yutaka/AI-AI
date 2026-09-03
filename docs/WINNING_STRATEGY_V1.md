@@ -61,6 +61,25 @@ ordered failure contexts. `select_correlation_diverse_portfolio()` then
 penalizes candidates that fail in the same contexts as already selected
 candidates, instead of relying only on a manually assigned cluster label.
 
+## Integrated ranking
+
+`rank_winning_portfolio()` combines the transfer, exact-runtime, runtime
+sensitivity, optional minimum-trace, throughput and failure-correlation gates.
+Only candidates that survive the hard research gates enter portfolio selection.
+
+For already materialized replay evidence, the JSON adapter exposes the same
+ranking boundary as a single command:
+
+```bash
+kaggle-security-lab rank-winning-portfolio \
+  examples/kaggle-winning-strategy.example.json
+```
+
+The JSON route deliberately consumes recorded target replay evidence. The
+minimum-trace reducer needs a live caller-owned replay evaluator and therefore
+remains a Python API operation rather than pretending a static JSON file can
+re-run an evaluator.
+
 ## Boundary
 
 These are research utilities only.
