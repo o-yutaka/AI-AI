@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from .models import Split
 
@@ -46,6 +46,8 @@ def freeze_dataset(
         else:
             split = Split.ADVERSARIAL_HELD_OUT
         rows.append(FrozenInstance(raw, split, identity))
-    manifest = "\n".join(f"{r.instance_id}\t{r.split.value}\t{r.identity_hash}" for r in rows)
+    manifest = "\n".join(
+        f"{row.instance_id}\t{row.split.value}\t{row.identity_hash}" for row in rows
+    )
     manifest_hash = hashlib.sha256(manifest.encode()).hexdigest()
     return FrozenDataset(dataset_id, source_revision, tuple(rows), manifest_hash)
