@@ -20,7 +20,7 @@ def rank_and_judge(
     robustness_by_family: dict[str, RobustnessEnvelope],
     *,
     split: Split,
-    thresholds: JudgeThresholds = JudgeThresholds(),
+    thresholds: JudgeThresholds | None = None,
 ) -> list[ResearchDecision]:
     graph = HypothesisGraph(hypotheses)
     families = score_families(graph, observations)
@@ -31,14 +31,22 @@ def rank_and_judge(
             decisions.append(
                 ResearchDecision(
                     family=family,
-                    judge=JudgeVerdict("BLOCKED", ("robustness_evidence_missing",)),
+                    judge=JudgeVerdict(
+                        "BLOCKED",
+                        ("robustness_evidence_missing",),
+                    ),
                 )
             )
             continue
         decisions.append(
             ResearchDecision(
                 family=family,
-                judge=judge_family(family, envelope, split=split, thresholds=thresholds),
+                judge=judge_family(
+                    family,
+                    envelope,
+                    split=split,
+                    thresholds=thresholds,
+                ),
             )
         )
     return decisions
