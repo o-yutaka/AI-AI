@@ -1,22 +1,23 @@
-# Reusable AI Agent Architecture
+# Kaggle AI Agent Security Lab Architecture
 
-## Implemented full-stack boundary
+The canonical architecture is frozen in [`KAGGLE_SECURITY_LAB_ARCHITECTURE.md`](KAGGLE_SECURITY_LAB_ARCHITECTURE.md).
+
+## Implemented runtime boundary
 
 ```text
-Next.js dashboard
-    -> FastAPI request
+FastAPI / caller
     -> typed RunRequest
+    -> untrusted CandidateAction set
     -> current action contract
-    -> candidate eligibility checks
+    -> permission / evidence / sensitive-data gates
+    -> declared tool-capability gate
     -> deterministic ranking
-    -> policy gate
     -> approval or rejection
-    -> executor
-    -> stored trace copy
-    -> dashboard inspection
+    -> fixed ToolRegistryExecutor
+    -> durable audit / fingerprint / replay state
 ```
 
-The implementation is intentionally small and uses in-memory storage. It demonstrates control flow and invariants, not production persistence.
+The existing `control_plane/` package is the lab's deterministic evaluation runtime. It is retained as a reusable environment for controlled multi-step agent-tool experiments.
 
 ## Implemented invariants
 
@@ -24,65 +25,32 @@ The implementation is intentionally small and uses in-memory storage. It demonst
 2. An action outside the current contract cannot execute.
 3. Required permissions must be granted.
 4. High-risk actions require evidence.
-5. High-risk or irreversible actions require a named human decision.
-6. A rejected action is never executed.
-7. Repeating the same request with the same idempotency key does not execute twice.
-8. Reusing an idempotency key for different input is rejected.
-9. Executor exceptions become structured failed traces.
-10. Retrieval returns a defensive copy rather than the stored object.
-11. Set ordering cannot change request fingerprints.
+5. Sensitive payloads are rejected before execution.
+6. Undeclared tool operations are rejected.
+7. High-risk or irreversible actions require a named human decision.
+8. A rejected action is never executed.
+9. Repeating the same request with the same idempotency key does not execute twice.
+10. Reusing an idempotency key for different input is rejected.
+11. Request fingerprints are canonical and deterministic.
 12. Candidate tie-breaking is deterministic.
+13. Model output cannot choose arbitrary hosts, methods, paths, redirect targets, or credentials.
+14. Streaming provider/tool responses are bounded.
 
-## Components
+## Research export boundary
 
-### Action contract
+`research_bundle/` is the only canonical external knowledge contract.
 
-The contract carries a version, currently allowed action IDs, and granted permissions. This maps to an external engine option list, a SaaS capability document, or a user authorization scope.
+It exports `security-research-bundle.v1` containing research objects such as hypotheses, probes, observations, trajectories, findings, failure findings, robustness results, benchmark results, provenance, and artifact hashes.
 
-### Candidate validation
+It deliberately does not export BLACK `Experience`, BLACK `Lesson`, held-out verification, promotion/adoption decisions, or execution authority.
 
-Candidates are rejected before ranking when they are absent from the current contract, require missing permissions, or lack evidence required by risk policy.
+```text
+control_plane experiment
+    -> trace / replay
+    -> analysis
+    -> research_bundle
+    -> canonical JSON + SHA-256
+    -> external consumer
+```
 
-### Deterministic ranking
-
-Eligible candidates are sorted by:
-
-1. Higher expected value
-2. Lower risk
-3. Reversible before irreversible
-4. Lexicographically smaller action ID
-
-### Approval gate
-
-High-risk or irreversible selected actions enter `waiting_approval`. A named approver submits `approve` or `reject` with a reason. Rejected runs never call the executor.
-
-### Audit trace
-
-Each trace records:
-
-- Observation fingerprint
-- Request fingerprint
-- Contract version
-- All candidates
-- Eligible action IDs
-- Rejected candidates and reasons
-- Policy checks
-- Selected action
-- Approval identity and reason
-- Execution result or structured error
-- Timestamped events
-- Revision number
-
-### Operations dashboard
-
-The Next.js client exposes the runtime behavior directly rather than presenting a decorative chat screen. It shows decisions, rejected alternatives, policy checks, approval state, execution events, and trace identity.
-
-## Production extension points
-
-- PostgreSQL run repository and append-only event store
-- Authentication, RBAC, and tenant isolation
-- Durable queue and worker processes
-- Timeout and retry policies around network tools
-- OpenAI-compatible model/planner routing
-- OpenTelemetry metrics and traces
-- Real CRM, email, RAG, and billing adapters
+See the canonical document for the BLACK compatibility boundary and future module layout.

@@ -1,0 +1,135 @@
+from .belief import HypothesisBelief, initial_beliefs, select_next_probe, update_belief
+from .budget import BudgetPlan, allocate_budget
+from .budget_ledger import BudgetLedger, BudgetStage
+from .candidate_pack import CandidatePackage, CandidateRecord, package_candidates
+from .competition import CompetitionAdapter, CompetitionSpec, KaggleAgentSecurityAdapter
+from .compiler import CompiledRequest, GenericChatCompiler, ModelCompiler
+from .compute import ComputeRequest, ComputeTarget, select_compute_target
+from .control_plane_bridge import ControlPlaneReplayAdapter
+from .dataset import FrozenDataset, FrozenInstance, freeze_dataset
+from .evaluator import EvaluatorDimension, EvaluatorSpec, decompose_evaluator
+from .export_bridge import build_research_bundle
+from .freeze import CandidateFreeze, freeze_candidates
+from .hypothesis import HypothesisGraph, score_families
+from .judge import JudgeThresholds, JudgeVerdict, judge_family
+from .leakage import ResearchPurpose, assert_disjoint_instance_sets, assert_split_allowed
+from .ledger import LedgerRecord, append_record, load_records, verify_chain
+from .manifest import ExperimentManifest
+from .models import (
+    EnvironmentIdentity,
+    FamilyResult,
+    Hypothesis,
+    Observation,
+    Probe,
+    ProbeVerdict,
+    Split,
+    Trajectory,
+)
+from .nuisance import SweepCase, build_sweep
+from .objective import Objective, ObjectiveResult, WeightedObjective
+from .pipeline import ResearchDecision, rank_and_judge
+from .portfolio import CandidateProfile, select_diverse_portfolio
+from .primitives import AttackPrimitive, CompositionKind, PrimitiveComposition
+from .probe import compile_minimal_falsification_probe, compile_probe
+from .replay import ReplayResult, replay_probe
+from .reproducibility import sha256_file, stable_hash, verify_expected_hash
+from .research_plan import ResearchPlan, build_research_plan
+from .robustness import RobustnessEnvelope, RobustnessSample, build_robustness_envelope
+from .runner import ExperimentCase, ExperimentRun, run_cases
+from .runtime_matrix import RuntimeMatrix, RuntimeVariant, build_runtime_matrix
+from .session import ResearchSession
+from .telemetry import RuntimeTelemetry, measure_runtime
+from .throughput import ThroughputEstimate, estimate_throughput
+from .transfer import TransferEstimate, TransferPair, fit_linear_transfer
+
+__all__ = [
+    "AttackPrimitive",
+    "BudgetLedger",
+    "BudgetPlan",
+    "BudgetStage",
+    "CandidateFreeze",
+    "CandidatePackage",
+    "CandidateProfile",
+    "CandidateRecord",
+    "CompiledRequest",
+    "CompetitionAdapter",
+    "CompetitionSpec",
+    "CompositionKind",
+    "ComputeRequest",
+    "ComputeTarget",
+    "ControlPlaneReplayAdapter",
+    "EnvironmentIdentity",
+    "EvaluatorDimension",
+    "EvaluatorSpec",
+    "ExperimentCase",
+    "ExperimentManifest",
+    "ExperimentRun",
+    "FamilyResult",
+    "FrozenDataset",
+    "FrozenInstance",
+    "GenericChatCompiler",
+    "Hypothesis",
+    "HypothesisBelief",
+    "HypothesisGraph",
+    "JudgeThresholds",
+    "JudgeVerdict",
+    "KaggleAgentSecurityAdapter",
+    "LedgerRecord",
+    "ModelCompiler",
+    "Objective",
+    "ObjectiveResult",
+    "Observation",
+    "PrimitiveComposition",
+    "Probe",
+    "ProbeVerdict",
+    "ReplayResult",
+    "ResearchDecision",
+    "ResearchPlan",
+    "ResearchPurpose",
+    "ResearchSession",
+    "RobustnessEnvelope",
+    "RobustnessSample",
+    "RuntimeMatrix",
+    "RuntimeTelemetry",
+    "RuntimeVariant",
+    "Split",
+    "SweepCase",
+    "ThroughputEstimate",
+    "Trajectory",
+    "TransferEstimate",
+    "TransferPair",
+    "WeightedObjective",
+    "allocate_budget",
+    "append_record",
+    "assert_disjoint_instance_sets",
+    "assert_split_allowed",
+    "build_research_bundle",
+    "build_research_plan",
+    "build_robustness_envelope",
+    "build_runtime_matrix",
+    "build_sweep",
+    "compile_minimal_falsification_probe",
+    "compile_probe",
+    "decompose_evaluator",
+    "estimate_throughput",
+    "fit_linear_transfer",
+    "freeze_candidates",
+    "freeze_dataset",
+    "initial_beliefs",
+    "judge_family",
+    "load_records",
+    "measure_runtime",
+    "package_candidates",
+    "rank_and_judge",
+    "replay_probe",
+    "run_cases",
+    "score_families",
+    "select_compute_target",
+    "select_diverse_portfolio",
+    "select_next_probe",
+    "sha256_file",
+    "stable_hash",
+    "update_belief",
+    "verify_chain",
+    "verify_expected_hash",
+]
