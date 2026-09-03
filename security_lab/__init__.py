@@ -84,6 +84,10 @@ from .transfer import (
     fit_linear_transfer,
     fit_ridge_transfer,
 )
+from .winning_io import (
+    rank_winning_portfolio_from_mapping,
+    winning_strategy_result_payload,
+)
 from .winning_pipeline import (
     WinningCandidateAssessment,
     WinningCandidateEvidence,
@@ -196,6 +200,7 @@ __all__ = [
     "package_candidates",
     "rank_and_judge",
     "rank_winning_portfolio",
+    "rank_winning_portfolio_from_mapping",
     "reorder_genes",
     "replace_gene_text",
     "replay_probe",
@@ -212,4 +217,5 @@ __all__ = [
     "update_belief",
     "verify_chain",
     "verify_expected_hash",
+    "winning_strategy_result_payload",
 ]
