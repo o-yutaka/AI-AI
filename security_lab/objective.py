@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping, Protocol
+from typing import Protocol
 
 
 @dataclass(frozen=True)
@@ -14,6 +15,7 @@ class ObjectiveResult:
 
 class Objective(Protocol):
     objective_id: str
+
     def evaluate(self, metrics: Mapping[str, float]) -> ObjectiveResult: ...
 
 
@@ -24,5 +26,13 @@ class WeightedObjective:
     threshold: float
 
     def evaluate(self, metrics: Mapping[str, float]) -> ObjectiveResult:
-        score = sum(float(metrics.get(name, 0.0)) * weight for name, weight in self.weights.items())
-        return ObjectiveResult(self.objective_id, score, score >= self.threshold, dict(metrics))
+        score = sum(
+            float(metrics.get(name, 0.0)) * weight
+            for name, weight in self.weights.items()
+        )
+        return ObjectiveResult(
+            self.objective_id,
+            score,
+            score >= self.threshold,
+            dict(metrics),
+        )
