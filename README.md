@@ -195,6 +195,18 @@ POST /v1/runs/{run_id}/decision
 
 CI continues to cover Python lint/tests, contract/permission/evidence blocking, approval/rejection, idempotency/replay, provider privacy, tool response limits, SQLite durability, frontend build, container build, and browser proof. The new research bundle tests additionally lock canonical deterministic hashing and BLACK vocabulary separation.
 
+### Preserved public simulation proof
+
+The original **PUBLIC SIMULATION** remains a validation surface for the retained `control_plane/` runtime while this repository is being renamed. Its compatibility proof URL is:
+
+<https://raw.githack.com/o-yutaka/AI-AI/main/docs/live-demo.html>
+
+Committed visual proof remains available at [`docs/assets/proof/ai-agent-control-plane-proof.gif`](docs/assets/proof/ai-agent-control-plane-proof.gif), with machine-readable verification in [`docs/assets/proof/visual-proof-manifest.json`](docs/assets/proof/visual-proof-manifest.json).
+
+The proof contract includes blocked and pre-approval paths with execution count `0`, and approved/idempotent successful paths with execution count `1`.
+
+The clean Pages destination is prepared for the renamed project, but until `docs/live-status.json` records successful verification it is **not described as live**. A clean Pages URL should only be promoted after repository-level Pages is enabled and the verification record confirms success.
+
 ## License
 
 MIT — see [`LICENSE`](LICENSE).
