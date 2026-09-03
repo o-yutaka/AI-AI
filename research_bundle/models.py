@@ -99,13 +99,65 @@ class ProvenanceRecord(StrictModel):
     captured_at: datetime
 
 
-class SecurityResearchBundle(StrictModel):
-    """BLACK-independent export artifact for Kaggle security research.
+class KnowledgeMaterial(StrictModel):
+    """Neutral, evidence-bound material intended for later BLACK interpretation."""
 
-    This bundle records observations and research claims only. It deliberately
-    does not mint BLACK Experience, Lesson, held-out verification, promotion,
-    adoption, or execution authority.
-    """
+    material_id: str
+    kind: Literal[
+        "HYPOTHESIS_UPDATE",
+        "SUCCESS_CONDITION",
+        "FAILURE_MODE",
+        "RUNTIME_SENSITIVITY",
+        "TRANSFER_BEHAVIOR",
+        "ROBUSTNESS_SIGNAL",
+        "SEMANTIC_GENOME",
+        "NUISANCE_EFFECT",
+        "FAILURE_CORRELATION",
+        "SEARCH_DECISION",
+        "ELIMINATED_CANDIDATE",
+        "TRACE_REDUCTION",
+        "THROUGHPUT_SIGNAL",
+        "EVALUATOR_SIGNAL",
+        "OTHER",
+    ]
+    subject_ref: str
+    statement: str
+    evidence_refs: list[str]
+    environment_refs: list[str] = []
+    metrics: dict[str, float] = {}
+    tags: list[str] = []
+    confidence: float = Field(ge=0, le=1)
+    independently_verified: Literal[False] = False
+
+
+class ResearchDecisionRecord(StrictModel):
+    """Records why research chose, rejected, or stopped a path without authority."""
+
+    decision_id: str
+    stage: str
+    candidates_considered: list[str]
+    selected: list[str]
+    rejected: list[str]
+    rationale: str
+    evidence_refs: list[str]
+    budget_units_spent: float = Field(ge=0)
+    authority: Literal["NONE"] = "NONE"
+
+
+class EnvironmentRecord(StrictModel):
+    environment_id: str
+    model_id: str
+    runtime_id: str
+    compiler_id: str | None = None
+    quantization: str | None = None
+    runtime_version: str | None = None
+    tokenizer_revision: str | None = None
+    tool_surface_hash: str | None = None
+    evaluator_hash: str | None = None
+
+
+class SecurityResearchBundle(StrictModel):
+    """BLACK-independent v1 export artifact retained for compatibility."""
 
     schema_version: Literal["security-research-bundle.v1"] = "security-research-bundle.v1"
     competition: CompetitionIdentity
@@ -120,3 +172,29 @@ class SecurityResearchBundle(StrictModel):
     benchmark_results: list[BenchmarkResult] = []
     provenance: list[ProvenanceRecord] = []
     artifact_hashes: dict[str, str] = {}
+
+
+class SecurityResearchBundleV2(StrictModel):
+    """Lossless research-material export for BLACK absorption.
+
+    V2 preserves not only positive findings but also failed paths, environment
+    sensitivity, transfer behavior, search decisions and other neutral research
+    material. It still mints no BLACK Experience, Lesson, verification or authority.
+    """
+
+    schema_version: Literal["security-research-bundle.v2"] = "security-research-bundle.v2"
+    competition: CompetitionIdentity
+    generated_at: datetime
+    hypotheses: list[Hypothesis] = []
+    probes: list[Probe] = []
+    observations: list[Observation] = []
+    trajectories: list[Trajectory] = []
+    findings: list[Finding] = []
+    failure_findings: list[FailureFinding] = []
+    robustness_results: list[RobustnessResult] = []
+    benchmark_results: list[BenchmarkResult] = []
+    provenance: list[ProvenanceRecord] = []
+    artifact_hashes: dict[str, str] = {}
+    knowledge_materials: list[KnowledgeMaterial] = []
+    research_decisions: list[ResearchDecisionRecord] = []
+    environments: list[EnvironmentRecord] = []
