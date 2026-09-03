@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from control_plane.models import DecisionTrace, RunRequest
 from control_plane.runtime import AgentRuntime
@@ -15,11 +15,7 @@ TraceInterpreter = Callable[[DecisionTrace], tuple[str, ProbeVerdict]]
 
 @dataclass
 class ControlPlaneReplayAdapter:
-    """Adapt the existing AI-AI control plane to the security-lab ReplayExecutor shape.
-
-    The adapter preserves the control plane as the execution/gating runtime and
-    leaves research interpretation explicit. It never auto-approves waiting runs.
-    """
+    """Adapt the existing control plane to the security-lab replay shape."""
 
     runtime: AgentRuntime
     request_factory: RequestFactory
@@ -40,15 +36,18 @@ class ControlPlaneReplayAdapter:
             }
             for event in trace.events
         ]
+        selected_action_id = (
+            trace.selected_action.action_id
+            if trace.selected_action is not None
+            else None
+        )
         steps.append(
             {
                 "trace_status": trace.status.value,
                 "run_id": trace.run_id,
                 "request_fingerprint": trace.request_fingerprint,
                 "observation_fingerprint": trace.observation_fingerprint,
-                "selected_action_id": (
-                    trace.selected_action.action_id if trace.selected_action is not None else None
-                ),
+                "selected_action_id": selected_action_id,
             }
         )
         metrics = {
