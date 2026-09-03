@@ -13,6 +13,7 @@ from .candidate_pack import CandidateRecord, package_candidates
 from .competition import KaggleAgentSecurityAdapter
 from .compute import ComputeRequest, ComputeTarget, select_compute_target
 from .dataset import freeze_dataset
+from .kaggle_remote import KaggleRemoteJob, KaggleRemoteRunner, KaggleRunMode
 from .manifest import ExperimentManifest
 from .research_plan import build_research_plan
 
@@ -40,6 +41,20 @@ def main() -> int:
     package.add_argument("path", help="JSON array of candidate records")
     research = subparsers.add_parser("plan-research")
     research.add_argument("path", help="JSON research-plan specification")
+
+    remote = subparsers.add_parser("kaggle-remote")
+    remote.add_argument("notebook_ref", help="Kaggle notebook as owner/slug")
+    remote.add_argument("--output-dir", required=True)
+    remote.add_argument("--cache-dir", default=".kaggle-lab")
+    remote.add_argument("--workspace-dir")
+    remote.add_argument(
+        "--mode",
+        choices=[item.value for item in KaggleRunMode],
+        default=KaggleRunMode.REUSE_ONLY.value,
+        help="reuse-only never executes; cpu/gpu require explicit opt-in",
+    )
+    remote.add_argument("--timeout-seconds", type=float, default=15 * 60)
+    remote.add_argument("--poll-seconds", type=float, default=5.0)
 
     args = parser.parse_args()
     if args.command in {"verify-bundle", "canonicalize-bundle"}:
@@ -104,12 +119,7 @@ def main() -> int:
         )
         return 0
     if args.command == "plan-budget":
-        print(
-            json.dumps(
-                asdict(allocate_budget(args.total_units)),
-                sort_keys=True,
-            )
-        )
+        print(json.dumps(asdict(allocate_budget(args.total_units)), sort_keys=True))
         return 0
     if args.command == "package-candidates":
         raw = json.loads(Path(args.path).read_text(encoding="utf-8"))
@@ -119,9 +129,7 @@ def main() -> int:
                 {
                     "package_id": package_result.package_id,
                     "canonical_sha256": package_result.canonical_sha256,
-                    "candidate_ids": [
-                        item.candidate_id for item in package_result.records
-                    ],
+                    "candidate_ids": [item.candidate_id for item in package_result.records],
                 },
                 sort_keys=True,
             )
@@ -154,13 +162,38 @@ def main() -> int:
             )
         )
         return 0
+    if args.command == "kaggle-remote":
+        result = KaggleRemoteRunner().run(
+            KaggleRemoteJob(
+                notebook_ref=args.notebook_ref,
+                output_dir=Path(args.output_dir),
+                cache_dir=Path(args.cache_dir),
+                workspace_dir=(Path(args.workspace_dir) if args.workspace_dir else None),
+                mode=KaggleRunMode(args.mode),
+                timeout_seconds=args.timeout_seconds,
+                poll_seconds=args.poll_seconds,
+            )
+        )
+        print(
+            json.dumps(
+                {
+                    "notebook_ref": result.notebook_ref,
+                    "job_fingerprint": result.job_fingerprint,
+                    "output_dir": str(result.output_dir),
+                    "output_sha256": result.output_sha256,
+                    "source": result.source,
+                    "executed": result.executed,
+                    "verified_fingerprint": result.verified_fingerprint,
+                },
+                sort_keys=True,
+            )
+        )
+        return 0
     return 2
 
 
 def _load_bundle(path: Path) -> SecurityResearchBundle:
-    return SecurityResearchBundle.model_validate_json(
-        path.read_text(encoding="utf-8")
-    )
+    return SecurityResearchBundle.model_validate_json(path.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
