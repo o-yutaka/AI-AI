@@ -84,6 +84,12 @@ from .transfer import (
     fit_linear_transfer,
     fit_ridge_transfer,
 )
+from .winning_pipeline import (
+    WinningCandidateAssessment,
+    WinningCandidateEvidence,
+    WinningStrategyResult,
+    rank_winning_portfolio,
+)
 
 __all__ = [
     "AttackPrimitive",
@@ -157,6 +163,9 @@ __all__ = [
     "TransferEstimate",
     "TransferPair",
     "WeightedObjective",
+    "WinningCandidateAssessment",
+    "WinningCandidateEvidence",
+    "WinningStrategyResult",
     "allocate_budget",
     "analyze_runtime_sensitivity",
     "append_record",
@@ -186,6 +195,7 @@ __all__ = [
     "minimize_winning_trace",
     "package_candidates",
     "rank_and_judge",
+    "rank_winning_portfolio",
     "reorder_genes",
     "replace_gene_text",
     "replay_probe",
