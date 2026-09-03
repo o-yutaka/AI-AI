@@ -16,9 +16,16 @@ from security_lab.kaggle_remote import (
 
 def _workspace(tmp_path: Path, *, gpu: bool = False) -> Path:
     root = tmp_path / "workspace"
-    root.mkdir()
+    root.mkdir(parents=True)
     notebook = {
-        "cells": [{"cell_type": "code", "source": ["print('hello')\n"], "metadata": {}, "outputs": []}],
+        "cells": [
+            {
+                "cell_type": "code",
+                "source": ["print('hello')\n"],
+                "metadata": {},
+                "outputs": [],
+            }
+        ],
         "metadata": {},
         "nbformat": 4,
         "nbformat_minor": 5,
@@ -53,7 +60,9 @@ def test_staging_injects_marker_without_modifying_editable_notebook(tmp_path: Pa
 
     assert before == after
     assert len(staged_payload["cells"]) == 2
-    assert staged_payload["cells"][-1]["metadata"]["tags"] == ["security-lab-fingerprint"]
+    assert staged_payload["cells"][-1]["metadata"]["tags"] == [
+        "security-lab-fingerprint"
+    ]
 
 
 def test_resource_modes_require_explicit_matching_metadata(tmp_path: Path) -> None:
@@ -69,7 +78,9 @@ def test_resource_modes_require_explicit_matching_metadata(tmp_path: Path) -> No
         KaggleRemoteRunner._assert_resource_mode(gpu_workspace, KaggleRunMode.CPU)
 
 
-def test_reuse_only_returns_matching_local_cache_without_kaggle_execution(tmp_path: Path) -> None:
+def test_reuse_only_returns_matching_local_cache_without_kaggle_execution(
+    tmp_path: Path,
+) -> None:
     workspace = _workspace(tmp_path)
     fingerprint = workspace_fingerprint(workspace)
     cache = tmp_path / "cache"
