@@ -23,6 +23,7 @@ def test_stage_scratch_script_is_private_offline_and_competition_bound(tmp_path:
         title="BLACK Scratch",
         source="print('ok')",
         competition_slug="ai-agent-security-multi-step-tool-attacks",
+        enable_gpu=True,
     )
     metadata = json.loads((root / "kernel-metadata.json").read_text(encoding="utf-8"))
     assert metadata["is_private"] is True
