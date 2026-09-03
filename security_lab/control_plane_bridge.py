@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 from control_plane.models import DecisionTrace, RunRequest
 from control_plane.runtime import AgentRuntime
-
 from .models import Probe, ProbeVerdict
 
 
