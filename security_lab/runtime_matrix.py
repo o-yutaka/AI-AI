@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from itertools import product
-from typing import Iterable
 
 
 @dataclass(frozen=True)
@@ -27,6 +27,8 @@ def build_runtime_matrix(
 ) -> RuntimeMatrix:
     variants = tuple(
         RuntimeVariant(*values)
-        for values in sorted(product(model_ids, runtime_ids, compiler_ids, quantizations))
+        for values in sorted(
+            product(model_ids, runtime_ids, compiler_ids, quantizations)
+        )
     )
     return RuntimeMatrix(variants)
