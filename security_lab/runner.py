@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable
+from typing import Any
 
 from .models import EnvironmentIdentity, Hypothesis, Probe, ProbeVerdict, Split
 from .probe import compile_probe
@@ -36,11 +37,7 @@ def run_cases(
     *,
     execute: CaseExecutor,
 ) -> list[ExperimentRun]:
-    """Run model-neutral research cases through the canonical replay boundary.
-
-    The runner knows runtime identity and split, but never BLACK authority,
-    leaderboard authority, or adoption/promotion state.
-    """
+    """Run model-neutral research cases through the canonical replay boundary."""
     runs: list[ExperimentRun] = []
     for case in cases:
         payload = {
@@ -53,10 +50,17 @@ def run_cases(
             split=case.split,
             budget_cost=case.budget_cost,
         )
+
+        def execute_current(
+            current_probe: Probe,
+            current_case: ExperimentCase = case,
+        ) -> tuple[str, ProbeVerdict, list[dict[str, Any]], dict[str, float]]:
+            return execute(current_probe, current_case)
+
         replay = replay_probe(
             probe,
             case.environment,
-            lambda current_probe: execute(current_probe, case),
+            execute_current,
         )
         runs.append(ExperimentRun(case=case, probe=probe, replay=replay))
     return runs
