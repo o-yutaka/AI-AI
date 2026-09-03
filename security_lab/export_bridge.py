@@ -2,12 +2,16 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from research_bundle.models import CompetitionIdentity, ProvenanceRecord
+from research_bundle.models import (
+    CompetitionIdentity,
+    ProvenanceRecord,
+    RobustnessResult,
+    SecurityResearchBundle,
+)
 from research_bundle.models import Finding as BundleFinding
 from research_bundle.models import Hypothesis as BundleHypothesis
 from research_bundle.models import Observation as BundleObservation
 from research_bundle.models import Probe as BundleProbe
-from research_bundle.models import RobustnessResult, SecurityResearchBundle
 from research_bundle.models import Trajectory as BundleTrajectory
 
 from .models import Hypothesis, Observation, Probe, ProbeVerdict, Trajectory
