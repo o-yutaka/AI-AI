@@ -11,6 +11,7 @@ from .competition_objective import (
 )
 from .sdk_runtime_contract import (
     championship_replay_budgets,
+    kaggle_host_faq_contract,
     runtime_contract_from_mapping,
 )
 from .winning_io import rank_winning_portfolio_from_mapping, winning_strategy_result_payload
@@ -63,19 +64,27 @@ def _resolve_runtime_budgets(
 ) -> dict[str, float]:
     explicit = raw.get("runtime_budget_by_model")
     contract_raw = raw.get("runtime_contract")
-    if explicit is not None and contract_raw is not None:
+    profile_name = raw.get("runtime_contract_profile")
+    provided = sum(value is not None for value in (explicit, contract_raw, profile_name))
+    if provided > 1:
         raise ValueError(
-            "provide either runtime_budget_by_model or runtime_contract, not both"
+            "provide exactly one of runtime_budget_by_model, runtime_contract, "
+            "or runtime_contract_profile"
         )
     if explicit is not None:
         return {
             str(model_id): float(value)
             for model_id, value in _mapping(explicit).items()
         }
-    if contract_raw is None:
+    if contract_raw is not None:
+        contract = runtime_contract_from_mapping(dict(_mapping(contract_raw)))
+    elif profile_name is not None:
+        if str(profile_name) != "kaggle-host-faq-9000-v1":
+            raise ValueError(f"unknown runtime contract profile: {profile_name}")
+        contract = kaggle_host_faq_contract()
+    else:
         raise ValueError("championship run requires runtime budget information")
 
-    contract = runtime_contract_from_mapping(dict(_mapping(contract_raw)))
     policy = _mapping(raw.get("runtime_policy", {}))
     return championship_replay_budgets(
         contract,
