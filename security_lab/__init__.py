@@ -8,7 +8,7 @@ from .compute import ComputeRequest, ComputeTarget, select_compute_target
 from .control_plane_bridge import ControlPlaneReplayAdapter
 from .dataset import FrozenDataset, FrozenInstance, freeze_dataset
 from .evaluator import EvaluatorDimension, EvaluatorSpec, decompose_evaluator
-from .export_bridge import build_research_bundle
+from .export_bridge import build_research_bundle, build_research_bundle_v2
 from .failure_correlation import (
     FailureCorrelationGraph,
     FailureProfile,
@@ -36,8 +36,23 @@ from .models import (
     Split,
     Trajectory,
 )
-from .nuisance import SweepCase, build_sweep
+from .nuisance import (
+    NuisanceOutcome,
+    NuisanceSensitivityReport,
+    SweepCase,
+    analyze_nuisance_sensitivity,
+    build_sweep,
+    select_nuisance_stable_candidates,
+)
 from .objective import Objective, ObjectiveResult, WeightedObjective
+from .optimizer import (
+    DeterministicNeighborhoodOptimizer,
+    OptimizationCandidate,
+    OptimizationObservation,
+    OptimizationRequest,
+    Optimizer,
+    select_frontier,
+)
 from .pipeline import ResearchDecision, rank_and_judge
 from .portfolio import CandidateProfile, select_diverse_portfolio
 from .primitives import AttackPrimitive, CompositionKind, PrimitiveComposition
@@ -45,6 +60,14 @@ from .probe import compile_minimal_falsification_probe, compile_probe
 from .replay import ReplayResult, replay_probe
 from .reproducibility import sha256_file, stable_hash, verify_expected_hash
 from .research_plan import ResearchPlan, build_research_plan
+from .research_roles import (
+    ResearchArtifact,
+    ResearchContext,
+    ResearchOrchestrationResult,
+    ResearchRole,
+    ResearchRolePort,
+    orchestrate_research_roles,
+)
 from .robustness import RobustnessEnvelope, RobustnessSample, build_robustness_envelope
 from .runner import ExperimentCase, ExperimentRun, run_cases
 from .runtime_matrix import RuntimeMatrix, RuntimeVariant, build_runtime_matrix
@@ -111,6 +134,7 @@ __all__ = [
     "ComputeRequest",
     "ComputeTarget",
     "ControlPlaneReplayAdapter",
+    "DeterministicNeighborhoodOptimizer",
     "EnvironmentIdentity",
     "EvaluatorDimension",
     "EvaluatorSpec",
@@ -133,16 +157,27 @@ __all__ = [
     "LedgerRecord",
     "MinimumWinningTrace",
     "ModelCompiler",
+    "NuisanceOutcome",
+    "NuisanceSensitivityReport",
     "Objective",
     "ObjectiveResult",
     "Observation",
+    "OptimizationCandidate",
+    "OptimizationObservation",
+    "OptimizationRequest",
+    "Optimizer",
     "PrimitiveComposition",
     "Probe",
     "ProbeVerdict",
     "ReplayResult",
+    "ResearchArtifact",
+    "ResearchContext",
     "ResearchDecision",
+    "ResearchOrchestrationResult",
     "ResearchPlan",
     "ResearchPurpose",
+    "ResearchRole",
+    "ResearchRolePort",
     "ResearchSession",
     "RidgeTransferEstimate",
     "RobustnessEnvelope",
@@ -171,6 +206,7 @@ __all__ = [
     "WinningCandidateEvidence",
     "WinningStrategyResult",
     "allocate_budget",
+    "analyze_nuisance_sensitivity",
     "analyze_runtime_sensitivity",
     "append_record",
     "assert_disjoint_instance_sets",
@@ -179,6 +215,7 @@ __all__ = [
     "build_failure_correlation_graph",
     "build_replacement_neighborhood",
     "build_research_bundle",
+    "build_research_bundle_v2",
     "build_research_plan",
     "build_robustness_envelope",
     "build_runtime_matrix",
@@ -197,6 +234,7 @@ __all__ = [
     "load_records",
     "measure_runtime",
     "minimize_winning_trace",
+    "orchestrate_research_roles",
     "package_candidates",
     "rank_and_judge",
     "rank_winning_portfolio",
@@ -210,7 +248,9 @@ __all__ = [
     "select_compute_target",
     "select_correlation_diverse_portfolio",
     "select_diverse_portfolio",
+    "select_frontier",
     "select_next_probe",
+    "select_nuisance_stable_candidates",
     "sha256_file",
     "stable_hash",
     "toggle_gene",
