@@ -50,6 +50,16 @@ class ScenarioRobustPortfolioSelection:
     runtime_seconds_by_model: Mapping[str, float]
 
 
+@dataclass(frozen=True)
+class _BeamState:
+    profiles: tuple[CompetitionCandidateProfile, ...]
+    runtime_seconds: float
+
+    @property
+    def candidate_ids(self) -> tuple[str, ...]:
+        return tuple(sorted(item.candidate_id for item in self.profiles))
+
+
 def select_scenario_robust_portfolio(
     profiles: Sequence[CompetitionCandidateProfile],
     *,
@@ -58,16 +68,21 @@ def select_scenario_robust_portfolio(
     runtime_budget_by_model: Mapping[str, float],
     risk_aversion: float = 0.5,
     max_candidates_by_model: Mapping[str, int] | None = None,
+    beam_width: int = 32,
 ) -> ScenarioRobustPortfolioSelection:
-    """Greedily maximize expected/worst-case private score per runtime second.
+    """Search for a complementary private portfolio under scenario uncertainty.
 
     `risk_aversion=0` uses weighted scenario expectation. `risk_aversion=1` uses
-    the worst scenario only. Intermediate values blend both. Scenario survival
-    multiplies the evidence-bound per-finding survival already present in a profile.
+    the worst scenario only. A bounded beam is used instead of one-step greedy so
+    candidates that are weak alone but complementary together are not discarded.
+    Scenario survival multiplies the evidence-bound per-finding survival already
+    present in a profile.
     """
 
     if not 0.0 <= risk_aversion <= 1.0:
         raise ValueError("risk_aversion must be between 0 and 1")
+    if beam_width < 1:
+        raise ValueError("beam_width must be positive")
     if not profiles:
         return ScenarioRobustPortfolioSelection(
             selected_candidate_ids=(),
@@ -105,49 +120,25 @@ def select_scenario_robust_portfolio(
         budget = float(runtime_budget_by_model[model_id])
         if budget < 0 or not isfinite(budget):
             raise ValueError("runtime budgets must be finite and non-negative")
-        cap = None if max_candidates_by_model is None else max_candidates_by_model.get(model_id)
-        if cap is not None and cap < 1:
-            raise ValueError("model candidate caps must be positive")
+        cap = len(by_model[model_id])
+        if max_candidates_by_model is not None and model_id in max_candidates_by_model:
+            configured = max_candidates_by_model[model_id]
+            if configured < 1:
+                raise ValueError("model candidate caps must be positive")
+            cap = min(cap, configured)
 
-        selected: list[CompetitionCandidateProfile] = []
-        remaining = sorted(by_model[model_id], key=lambda item: item.candidate_id)
-        used_runtime = 0.0
-
-        while remaining:
-            if cap is not None and len(selected) >= cap:
-                break
-            current_robust = _portfolio_metrics(
-                selected,
-                scenario_map,
-                normalized_weights,
-                survival_map,
-                risk_aversion,
-            )[2]
-            options: list[tuple[float, float, float, str, CompetitionCandidateProfile]] = []
-            for candidate in remaining:
-                if used_runtime + candidate.runtime_seconds > budget + 1e-12:
-                    continue
-                _, _, next_robust, _ = _portfolio_metrics(
-                    [*selected, candidate],
-                    scenario_map,
-                    normalized_weights,
-                    survival_map,
-                    risk_aversion,
-                )
-                marginal = next_robust - current_robust
-                if marginal <= 0:
-                    continue
-                utility = marginal / candidate.runtime_seconds
-                options.append(
-                    (-utility, -marginal, candidate.runtime_seconds, candidate.candidate_id, candidate)
-                )
-            if not options:
-                break
-            chosen = sorted(options, key=lambda item: item[:4])[0][4]
-            selected.append(chosen)
-            used_runtime += chosen.runtime_seconds
-            remaining = [item for item in remaining if item.candidate_id != chosen.candidate_id]
-
+        model_profiles = tuple(sorted(by_model[model_id], key=lambda item: item.candidate_id))
+        selected_state = _beam_select_model(
+            model_profiles,
+            budget=budget,
+            cap=cap,
+            beam_width=beam_width,
+            scenarios=scenario_map,
+            normalized_weights=normalized_weights,
+            survival_map=survival_map,
+            risk_aversion=risk_aversion,
+        )
+        selected = list(selected_state.profiles)
         expected, worst, robust, scenario_scores = _portfolio_metrics(
             selected,
             scenario_map,
@@ -155,14 +146,14 @@ def select_scenario_robust_portfolio(
             survival_map,
             risk_aversion,
         )
-        ids = tuple(item.candidate_id for item in selected)
+        ids = selected_state.candidate_ids
         selected_by_model[model_id] = ids
         scenario_scores_by_model[model_id] = scenario_scores
         expected_by_model[model_id] = expected
         worst_by_model[model_id] = worst
         robust_by_model[model_id] = robust
         normalized_by_model[model_id] = official_normalized_score(robust)
-        runtime_by_model[model_id] = used_runtime
+        runtime_by_model[model_id] = selected_state.runtime_seconds
         selected_ids.extend(ids)
 
     return ScenarioRobustPortfolioSelection(
@@ -175,6 +166,86 @@ def select_scenario_robust_portfolio(
         robust_normalized_score_by_model=normalized_by_model,
         runtime_seconds_by_model=runtime_by_model,
     )
+
+
+def _beam_select_model(
+    profiles: tuple[CompetitionCandidateProfile, ...],
+    *,
+    budget: float,
+    cap: int,
+    beam_width: int,
+    scenarios: Mapping[str, PrivateGuardrailScenario],
+    normalized_weights: Mapping[str, float],
+    survival_map: Mapping[tuple[str, str], float],
+    risk_aversion: float,
+) -> _BeamState:
+    empty = _BeamState((), 0.0)
+    frontier = [empty]
+    best = empty
+
+    for _ in range(cap):
+        proposed: dict[tuple[str, ...], _BeamState] = {}
+        for state in frontier:
+            selected_ids = set(state.candidate_ids)
+            for candidate in profiles:
+                if candidate.candidate_id in selected_ids:
+                    continue
+                next_runtime = state.runtime_seconds + candidate.runtime_seconds
+                if next_runtime > budget + 1e-12:
+                    continue
+                next_profiles = tuple(
+                    sorted((*state.profiles, candidate), key=lambda item: item.candidate_id)
+                )
+                next_state = _BeamState(next_profiles, next_runtime)
+                proposed[next_state.candidate_ids] = next_state
+        if not proposed:
+            break
+
+        ranked = sorted(
+            proposed.values(),
+            key=lambda state: _state_rank(
+                state,
+                scenarios,
+                normalized_weights,
+                survival_map,
+                risk_aversion,
+            ),
+        )
+        frontier = ranked[:beam_width]
+        candidate_best = frontier[0]
+        if _state_rank(
+            candidate_best,
+            scenarios,
+            normalized_weights,
+            survival_map,
+            risk_aversion,
+        ) < _state_rank(
+            best,
+            scenarios,
+            normalized_weights,
+            survival_map,
+            risk_aversion,
+        ):
+            best = candidate_best
+
+    return best
+
+
+def _state_rank(
+    state: _BeamState,
+    scenarios: Mapping[str, PrivateGuardrailScenario],
+    normalized_weights: Mapping[str, float],
+    survival_map: Mapping[tuple[str, str], float],
+    risk_aversion: float,
+) -> tuple[float, float, float, tuple[str, ...]]:
+    expected, _worst, robust, _scores = _portfolio_metrics(
+        state.profiles,
+        scenarios,
+        normalized_weights,
+        survival_map,
+        risk_aversion,
+    )
+    return (-robust, -expected, state.runtime_seconds, state.candidate_ids)
 
 
 def _validated_scenarios(
