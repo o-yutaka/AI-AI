@@ -69,7 +69,16 @@ def select_scenario_robust_portfolio(
     if not 0.0 <= risk_aversion <= 1.0:
         raise ValueError("risk_aversion must be between 0 and 1")
     if not profiles:
-        return ScenarioRobustPortfolioSelection({}, {}, {}, {}, {}, {}, {}, {})  # type: ignore[arg-type]
+        return ScenarioRobustPortfolioSelection(
+            selected_candidate_ids=(),
+            selected_by_model={},
+            scenario_raw_scores_by_model={},
+            expected_raw_score_by_model={},
+            worst_case_raw_score_by_model={},
+            robust_raw_score_by_model={},
+            robust_normalized_score_by_model={},
+            runtime_seconds_by_model={},
+        )
     if len({profile.candidate_id for profile in profiles}) != len(profiles):
         raise ValueError("competition candidate IDs must be unique")
 
