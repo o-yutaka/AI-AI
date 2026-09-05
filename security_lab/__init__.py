@@ -15,6 +15,7 @@ from .competition_objective import (
     select_private_robust_portfolio,
 )
 from .compiler import CompiledRequest, GenericChatCompiler, ModelCompiler
+from .compiler_registry import CompilerCompatibility, CompilerKey, ModelCompilerRegistry
 from .compute import ComputeRequest, ComputeTarget, select_compute_target
 from .control_plane_bridge import ControlPlaneReplayAdapter
 from .dataset import FrozenDataset, FrozenInstance, freeze_dataset
@@ -159,6 +160,8 @@ __all__ = [
     "CandidateShape",
     "ChampionshipResult",
     "CompiledRequest",
+    "CompilerCompatibility",
+    "CompilerKey",
     "CompetitionAdapter",
     "CompetitionCandidateProfile",
     "CompetitionFindingSignal",
@@ -196,6 +199,7 @@ __all__ = [
     "LedgerRecord",
     "MinimumWinningTrace",
     "ModelCompiler",
+    "ModelCompilerRegistry",
     "ModelPhaseBudgets",
     "NuisanceOutcome",
     "NuisanceSensitivityReport",
