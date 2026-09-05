@@ -15,6 +15,7 @@ from .competition_objective import (
     select_private_robust_portfolio,
 )
 from .compiler import CompiledRequest, GenericChatCompiler, ModelCompiler
+from .compiler_registry import CompilerCompatibility, CompilerKey, ModelCompilerRegistry
 from .compute import ComputeRequest, ComputeTarget, select_compute_target
 from .control_plane_bridge import ControlPlaneReplayAdapter
 from .dataset import FrozenDataset, FrozenInstance, freeze_dataset
@@ -39,11 +40,7 @@ from .judge import JudgeThresholds, JudgeVerdict, judge_family
 from .leakage import ResearchPurpose, assert_disjoint_instance_sets, assert_split_allowed
 from .ledger import LedgerRecord, append_record, load_records, verify_chain
 from .manifest import ExperimentManifest
-from .minimum_trace import (
-    MinimumWinningTrace,
-    TraceEvaluation,
-    minimize_winning_trace,
-)
+from .minimum_trace import MinimumWinningTrace, TraceEvaluation, minimize_winning_trace
 from .models import (
     EnvironmentIdentity,
     FamilyResult,
@@ -102,6 +99,21 @@ from .runtime_sensitivity import (
     analyze_runtime_sensitivity,
     runtime_variant_key,
 )
+from .sdk_runtime_contract import (
+    CandidateShape,
+    CompetitionRuntimeContract,
+    ContractEvidenceTier,
+    ModelPhaseBudgets,
+    RuntimeCapacityPlan,
+    RuntimePhase,
+    SdkRunSignature,
+    championship_replay_budgets,
+    kaggle_host_faq_contract,
+    plan_runtime_capacity,
+    runtime_contract_from_mapping,
+    runtime_contract_payload,
+    validate_candidate_shapes,
+)
 from .semantic_genome import (
     GeneSlot,
     SemanticGene,
@@ -118,11 +130,7 @@ from .semantic_search import (
     beam_search_semantic_genomes,
 )
 from .session import ResearchSession
-from .target_gate import (
-    TargetReplayExpectation,
-    TargetReplayVerdict,
-    evaluate_target_replay,
-)
+from .target_gate import TargetReplayExpectation, TargetReplayVerdict, evaluate_target_replay
 from .telemetry import RuntimeTelemetry, measure_runtime
 from .throughput import ThroughputEstimate, estimate_throughput
 from .transfer import (
@@ -132,10 +140,7 @@ from .transfer import (
     fit_linear_transfer,
     fit_ridge_transfer,
 )
-from .winning_io import (
-    rank_winning_portfolio_from_mapping,
-    winning_strategy_result_payload,
-)
+from .winning_io import rank_winning_portfolio_from_mapping, winning_strategy_result_payload
 from .winning_pipeline import (
     WinningCandidateAssessment,
     WinningCandidateEvidence,
@@ -152,16 +157,21 @@ __all__ = [
     "CandidatePackage",
     "CandidateProfile",
     "CandidateRecord",
+    "CandidateShape",
     "ChampionshipResult",
     "CompiledRequest",
+    "CompilerCompatibility",
+    "CompilerKey",
     "CompetitionAdapter",
     "CompetitionCandidateProfile",
     "CompetitionFindingSignal",
     "CompetitionPortfolioSelection",
+    "CompetitionRuntimeContract",
     "CompetitionSpec",
     "CompositionKind",
     "ComputeRequest",
     "ComputeTarget",
+    "ContractEvidenceTier",
     "ControlPlaneReplayAdapter",
     "DeterministicNeighborhoodOptimizer",
     "EnvironmentIdentity",
@@ -189,6 +199,8 @@ __all__ = [
     "LedgerRecord",
     "MinimumWinningTrace",
     "ModelCompiler",
+    "ModelCompilerRegistry",
+    "ModelPhaseBudgets",
     "NuisanceOutcome",
     "NuisanceSensitivityReport",
     "Objective",
@@ -216,11 +228,14 @@ __all__ = [
     "RidgeTransferEstimate",
     "RobustnessEnvelope",
     "RobustnessSample",
+    "RuntimeCapacityPlan",
     "RuntimeMatrix",
     "RuntimeOutcome",
+    "RuntimePhase",
     "RuntimeSensitivityReport",
     "RuntimeTelemetry",
     "RuntimeVariant",
+    "SdkRunSignature",
     "SecurityPredicate",
     "SemanticGene",
     "SemanticGenome",
@@ -255,6 +270,7 @@ __all__ = [
     "build_robustness_envelope",
     "build_runtime_matrix",
     "build_sweep",
+    "championship_replay_budgets",
     "championship_result_payload",
     "compile_minimal_falsification_probe",
     "compile_probe",
@@ -268,12 +284,14 @@ __all__ = [
     "freeze_dataset",
     "initial_beliefs",
     "judge_family",
+    "kaggle_host_faq_contract",
     "load_records",
     "measure_runtime",
     "minimize_winning_trace",
     "official_normalized_score",
     "orchestrate_research_roles",
     "package_candidates",
+    "plan_runtime_capacity",
     "rank_and_judge",
     "rank_winning_portfolio",
     "rank_winning_portfolio_from_mapping",
@@ -285,6 +303,8 @@ __all__ = [
     "run_championship_from_mapping",
     "run_research_loop",
     "run_research_loop_from_mapping",
+    "runtime_contract_from_mapping",
+    "runtime_contract_payload",
     "runtime_variant_key",
     "score_families",
     "select_championship_portfolio",
@@ -300,6 +320,7 @@ __all__ = [
     "summarize_hypothesis_evidence",
     "toggle_gene",
     "update_belief",
+    "validate_candidate_shapes",
     "verify_chain",
     "verify_expected_hash",
     "winning_strategy_result_payload",

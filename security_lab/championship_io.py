@@ -9,6 +9,11 @@ from .competition_objective import (
     CompetitionFindingSignal,
     SecurityPredicate,
 )
+from .sdk_runtime_contract import (
+    championship_replay_budgets,
+    kaggle_host_faq_contract,
+    runtime_contract_from_mapping,
+)
 from .winning_io import rank_winning_portfolio_from_mapping, winning_strategy_result_payload
 
 
@@ -19,10 +24,7 @@ def run_championship_from_mapping(raw: Mapping[str, Any]) -> ChampionshipResult:
         _competition_profile(_mapping(item))
         for item in _sequence(raw["competition_profiles"])
     ]
-    runtime_budget_by_model = {
-        str(model_id): float(value)
-        for model_id, value in _mapping(raw["runtime_budget_by_model"]).items()
-    }
+    runtime_budget_by_model = _resolve_runtime_budgets(raw, profiles)
     maximum_raw = raw.get("max_candidates_per_model")
     maximum = int(maximum_raw) if maximum_raw is not None else None
     return select_championship_portfolio(
@@ -54,6 +56,42 @@ def championship_result_payload(result: ChampionshipResult) -> dict[str, Any]:
             item.model_dump(mode="json") for item in result.knowledge_materials
         ],
     }
+
+
+def _resolve_runtime_budgets(
+    raw: Mapping[str, Any],
+    profiles: Sequence[CompetitionCandidateProfile],
+) -> dict[str, float]:
+    explicit = raw.get("runtime_budget_by_model")
+    contract_raw = raw.get("runtime_contract")
+    profile_name = raw.get("runtime_contract_profile")
+    provided = sum(value is not None for value in (explicit, contract_raw, profile_name))
+    if provided > 1:
+        raise ValueError(
+            "provide either runtime_budget_by_model or runtime_contract, "
+            "or runtime_contract_profile; not more than one"
+        )
+    if explicit is not None:
+        return {
+            str(model_id): float(value)
+            for model_id, value in _mapping(explicit).items()
+        }
+    if contract_raw is not None:
+        contract = runtime_contract_from_mapping(dict(_mapping(contract_raw)))
+    elif profile_name is not None:
+        if str(profile_name) != "kaggle-host-faq-9000-v1":
+            raise ValueError(f"unknown runtime contract profile: {profile_name}")
+        contract = kaggle_host_faq_contract()
+    else:
+        raise ValueError("championship run requires runtime budget information")
+
+    policy = _mapping(raw.get("runtime_policy", {}))
+    return championship_replay_budgets(
+        contract,
+        model_ids=tuple(profile.model_id for profile in profiles),
+        reserve_seconds=float(policy.get("reserve_seconds", 0.0)),
+        reserve_fraction=float(policy.get("reserve_fraction", 0.0)),
+    )
 
 
 def _competition_profile(raw: Mapping[str, Any]) -> CompetitionCandidateProfile:

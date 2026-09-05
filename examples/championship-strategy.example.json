@@ -107,8 +107,22 @@
       }
     ]
   },
-  "runtime_budget_by_model": {
-    "example-model": 60.0
+  "runtime_contract": {
+    "contract_id": "example-runtime-contract-v1",
+    "evidence_tier": "USER_SUPPLIED",
+    "source_ref": "examples/championship-strategy.example.json",
+    "run_signature": "UNKNOWN",
+    "model_phase_budgets": {
+      "example-model": {
+        "attack_generation_s": 60.0,
+        "public_replay_s": 60.0,
+        "private_replay_s": 60.0
+      }
+    }
+  },
+  "runtime_policy": {
+    "reserve_seconds": 0.0,
+    "reserve_fraction": 0.0
   },
   "max_candidates_per_model": 1,
   "competition_profiles": [
