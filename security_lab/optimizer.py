@@ -81,15 +81,16 @@ def select_frontier(
     latest: dict[str, OptimizationObservation] = {}
     for observation in observations:
         if observation.candidate_id not in by_id:
-            raise ValueError(f"observation references unknown candidate: {observation.candidate_id}")
+            raise ValueError(
+                f"observation references unknown candidate: {observation.candidate_id}"
+            )
         latest[observation.candidate_id] = observation
 
-    ranked = sorted(
-        by_id.values(),
-        key=lambda candidate: (
-            not latest.get(candidate.candidate_id, OptimizationObservation(candidate.candidate_id, float("-inf"))).passed,
-            -latest.get(candidate.candidate_id, OptimizationObservation(candidate.candidate_id, float("-inf"))).score,
+    def rank_key(candidate: OptimizationCandidate) -> tuple[bool, float, str]:
+        observation = latest.get(
             candidate.candidate_id,
-        ),
-    )
-    return tuple(ranked[:limit])
+            OptimizationObservation(candidate.candidate_id, float("-inf")),
+        )
+        return (not observation.passed, -observation.score, candidate.candidate_id)
+
+    return tuple(sorted(by_id.values(), key=rank_key)[:limit])
