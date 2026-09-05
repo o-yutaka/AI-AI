@@ -46,17 +46,34 @@ def run_research_loop(
         raise ValueError("max_steps must be non-negative")
 
     graph = HypothesisGraph(list(hypotheses))
+    hypothesis_ids = {item.hypothesis_id for item in hypotheses}
+    probe_by_id = {item.probe_id: item for item in probes}
+    if len(probe_by_id) != len(probes):
+        raise ValueError("probe ids must be unique")
+    for probe in probes:
+        if probe.hypothesis_id not in hypothesis_ids:
+            raise ValueError(
+                f"probe {probe.probe_id} references unknown hypothesis {probe.hypothesis_id}"
+            )
+
     beliefs = initial_beliefs(list(hypotheses))
     observations = list(seed_observations)
-    completed = {item.probe_id for item in seed_observations}
+    completed: set[str] = set()
     decisions: list[ResearchDecisionRecord] = []
     materials: list[KnowledgeMaterial] = []
 
     for observation in seed_observations:
-        hypothesis_id = observation.probe_id.split("::", 1)[0]
-        belief = beliefs.get(hypothesis_id)
-        if belief is not None:
-            beliefs[hypothesis_id] = update_belief(belief, observation)
+        if observation.probe_id in completed:
+            raise ValueError(f"duplicate seed observation for probe {observation.probe_id}")
+        probe = probe_by_id.get(observation.probe_id)
+        if probe is None:
+            raise ValueError(
+                f"seed observation references unknown probe {observation.probe_id}"
+            )
+        assert_split_allowed(ResearchPurpose.FALSIFICATION, probe.split)
+        completed.add(observation.probe_id)
+        belief = beliefs[probe.hypothesis_id]
+        beliefs[probe.hypothesis_id] = update_belief(belief, observation)
 
     steps = 0
     stopped_reason = "NO_AVAILABLE_PROBE"
@@ -81,7 +98,10 @@ def run_research_loop(
                     candidates_considered=[next_probe.probe_id],
                     selected=[],
                     rejected=[next_probe.probe_id],
-                    rationale="probe rejected because remaining falsification budget is insufficient",
+                    rationale=(
+                        "probe rejected because remaining falsification budget "
+                        "is insufficient"
+                    ),
                     evidence_refs=[],
                     budget_units_spent=0.0,
                 )
@@ -101,7 +121,7 @@ def run_research_loop(
         rejected = sorted(
             probe.probe_id
             for probe in probes
-            if probe.probe_id not in completed and probe.probe_id != next_probe.probe_id
+            if probe.probe_id not in completed
         )
         decisions.append(
             ResearchDecisionRecord(
@@ -157,7 +177,7 @@ def _knowledge_from_observation(observation: Observation) -> KnowledgeMaterial:
         ProbeVerdict.BLOCKED: 0.75,
     }[observation.verdict]
     return KnowledgeMaterial(
-        material_id=f"loop-material::{observation.observation_id}",
+        material_id=f"material::{observation.observation_id}",
         kind=kind,
         subject_ref=observation.probe_id,
         statement=f"research loop observed {observation.verdict.value.lower()}",
