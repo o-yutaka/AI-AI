@@ -148,12 +148,15 @@ class EnvironmentRecord(StrictModel):
     environment_id: str
     model_id: str
     runtime_id: str
+    model_revision: str | None = None
     compiler_id: str | None = None
     quantization: str | None = None
     runtime_version: str | None = None
     tokenizer_revision: str | None = None
     tool_surface_hash: str | None = None
     evaluator_hash: str | None = None
+    dataset_hash: str | None = None
+    seed: int | None = None
 
 
 class SecurityResearchBundle(StrictModel):

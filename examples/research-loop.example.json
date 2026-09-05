@@ -1,0 +1,85 @@
+{
+  "competition": {
+    "competition_slug": "ai-agent-security-multi-step-tool-attacks",
+    "competition_name": "AI Agent Security - Multi-Step Tool Attacks"
+  },
+  "generated_at": "2026-09-06T00:00:00Z",
+  "total_budget_units": 8.0,
+  "max_steps": 2,
+  "hypotheses": [
+    {
+      "hypothesis_id": "h1",
+      "family_id": "family-a",
+      "statement": "A neutral synthetic condition changes evaluator behavior.",
+      "falsification_condition": "Recorded evidence shows no distinction from baseline.",
+      "expected_observable": "signal-a",
+      "prior": 0.5
+    },
+    {
+      "hypothesis_id": "h2",
+      "family_id": "family-b",
+      "statement": "A second neutral condition remains stable across replay.",
+      "falsification_condition": "Replay evidence refutes stability.",
+      "expected_observable": "signal-b",
+      "prior": 0.5
+    }
+  ],
+  "probes": [
+    {
+      "probe_id": "h1::p1",
+      "hypothesis_id": "h1",
+      "split": "DEV",
+      "input_payload": {"synthetic": true},
+      "expected_observable": "signal-a",
+      "budget_cost": 0.5
+    },
+    {
+      "probe_id": "h2::p1",
+      "hypothesis_id": "h2",
+      "split": "DEV",
+      "input_payload": {"synthetic": true},
+      "expected_observable": "signal-b",
+      "budget_cost": 1.0
+    }
+  ],
+  "recorded_observations": [
+    {
+      "observation_id": "o1",
+      "probe_id": "h1::p1",
+      "observable": "signal-a",
+      "verdict": "SUPPORTED",
+      "metrics": {"score": 0.8},
+      "evidence_refs": ["evidence::o1"]
+    },
+    {
+      "observation_id": "o2",
+      "probe_id": "h2::p1",
+      "observable": "signal-b",
+      "verdict": "REFUTED",
+      "metrics": {"score": 0.2},
+      "evidence_refs": ["evidence::o2"]
+    }
+  ],
+  "trajectories": [
+    {
+      "trajectory_id": "t1",
+      "probe_id": "h1::p1",
+      "environment": {
+        "model_id": "example-model",
+        "model_revision": "rev-a",
+        "runtime_id": "example-runtime",
+        "runtime_version": "1.0.0",
+        "compiler_id": "generic-chat.v1",
+        "quantization": "target-format",
+        "tokenizer_revision": "tok-a"
+      },
+      "steps": [{"kind": "synthetic-observation"}],
+      "completed": true
+    }
+  ],
+  "robustness": {
+    "family-a": [
+      {"condition_id": "baseline", "score": 0.8, "success": true, "margin": 0.2}
+    ]
+  }
+}
