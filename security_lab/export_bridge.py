@@ -221,6 +221,7 @@ def _environment_records(trajectories: list[Trajectory]) -> list[EnvironmentReco
             environment_id=environment_id,
             model_id=environment.model_id,
             runtime_id=environment.runtime_id,
+            model_revision=environment.model_revision,
             compiler_id=environment.compiler_id,
             quantization=environment.quantization,
             runtime_version=environment.runtime_version,
