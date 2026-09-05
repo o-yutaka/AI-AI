@@ -3,9 +3,17 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
-from research_bundle.models import KnowledgeMaterial, ResearchDecisionRecord
+from research_bundle.models import (
+    KnowledgeMaterial,
+    ResearchDecisionRecord,
+)
 
-from .belief import HypothesisBelief, initial_beliefs, select_next_probe, update_belief
+from .belief import (
+    HypothesisBelief,
+    initial_beliefs,
+    select_next_probe,
+    update_belief,
+)
 from .budget_ledger import BudgetLedger, BudgetStage
 from .hypothesis import (
     HypothesisEvidenceState,
