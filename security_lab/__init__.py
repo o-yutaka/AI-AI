@@ -16,7 +16,14 @@ from .failure_correlation import (
     select_correlation_diverse_portfolio,
 )
 from .freeze import CandidateFreeze, freeze_candidates
-from .hypothesis import HypothesisGraph, score_families
+from .hypothesis import (
+    HypothesisEvidenceState,
+    HypothesisGraph,
+    HypothesisRelation,
+    HypothesisRelationType,
+    score_families,
+    summarize_hypothesis_evidence,
+)
 from .judge import JudgeThresholds, JudgeVerdict, judge_family
 from .leakage import ResearchPurpose, assert_disjoint_instance_sets, assert_split_allowed
 from .ledger import LedgerRecord, append_record, load_records, verify_chain
@@ -59,6 +66,13 @@ from .primitives import AttackPrimitive, CompositionKind, PrimitiveComposition
 from .probe import compile_minimal_falsification_probe, compile_probe
 from .replay import ReplayResult, replay_probe
 from .reproducibility import sha256_file, stable_hash, verify_expected_hash
+from .research_loop import (
+    ProbeExecutor,
+    ResearchLoopResult,
+    recorded_probe_executor,
+    run_research_loop,
+)
+from .research_loop_io import run_research_loop_from_mapping
 from .research_plan import ResearchPlan, build_research_plan
 from .research_roles import (
     ResearchArtifact,
@@ -150,7 +164,10 @@ __all__ = [
     "GenericChatCompiler",
     "Hypothesis",
     "HypothesisBelief",
+    "HypothesisEvidenceState",
     "HypothesisGraph",
+    "HypothesisRelation",
+    "HypothesisRelationType",
     "JudgeThresholds",
     "JudgeVerdict",
     "KaggleAgentSecurityAdapter",
@@ -168,11 +185,13 @@ __all__ = [
     "Optimizer",
     "PrimitiveComposition",
     "Probe",
+    "ProbeExecutor",
     "ProbeVerdict",
     "ReplayResult",
     "ResearchArtifact",
     "ResearchContext",
     "ResearchDecision",
+    "ResearchLoopResult",
     "ResearchOrchestrationResult",
     "ResearchPlan",
     "ResearchPurpose",
@@ -239,10 +258,13 @@ __all__ = [
     "rank_and_judge",
     "rank_winning_portfolio",
     "rank_winning_portfolio_from_mapping",
+    "recorded_probe_executor",
     "reorder_genes",
     "replace_gene_text",
     "replay_probe",
     "run_cases",
+    "run_research_loop",
+    "run_research_loop_from_mapping",
     "runtime_variant_key",
     "score_families",
     "select_compute_target",
@@ -253,6 +275,7 @@ __all__ = [
     "select_nuisance_stable_candidates",
     "sha256_file",
     "stable_hash",
+    "summarize_hypothesis_evidence",
     "toggle_gene",
     "update_belief",
     "verify_chain",
