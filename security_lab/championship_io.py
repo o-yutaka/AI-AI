@@ -14,14 +14,23 @@ from .sdk_runtime_contract import (
     kaggle_host_faq_contract,
     runtime_contract_from_mapping,
 )
+from .timing_signal import TimingCalibration
+from .timing_signal_io import (
+    resolve_private_survival_probability,
+    timing_calibrations_from_mapping,
+)
 from .winning_io import rank_winning_portfolio_from_mapping, winning_strategy_result_payload
 
 
 def run_championship_from_mapping(raw: Mapping[str, Any]) -> ChampionshipResult:
     winning_raw = _mapping(raw["winning_strategy"])
     winning_strategy = rank_winning_portfolio_from_mapping(winning_raw)
+    timing_raw = raw.get("timing_calibrations")
+    timing_calibrations = timing_calibrations_from_mapping(
+        None if timing_raw is None else _mapping(timing_raw)
+    )
     profiles = [
-        _competition_profile(_mapping(item))
+        _competition_profile(_mapping(item), timing_calibrations)
         for item in _sequence(raw["competition_profiles"])
     ]
     runtime_budget_by_model = _resolve_runtime_budgets(raw, profiles)
@@ -94,11 +103,14 @@ def _resolve_runtime_budgets(
     )
 
 
-def _competition_profile(raw: Mapping[str, Any]) -> CompetitionCandidateProfile:
+def _competition_profile(
+    raw: Mapping[str, Any],
+    timing_calibrations: Mapping[str, TimingCalibration],
+) -> CompetitionCandidateProfile:
     candidate_id = str(raw["candidate_id"])
     model_id = str(raw["model_id"])
     findings = tuple(
-        _finding(candidate_id, model_id, _mapping(item))
+        _finding(candidate_id, model_id, _mapping(item), timing_calibrations)
         for item in _sequence(raw.get("findings", ()))
     )
     return CompetitionCandidateProfile(
@@ -114,6 +126,7 @@ def _finding(
     candidate_id: str,
     model_id: str,
     raw: Mapping[str, Any],
+    timing_calibrations: Mapping[str, TimingCalibration],
 ) -> CompetitionFindingSignal:
     return CompetitionFindingSignal(
         candidate_id=str(raw.get("candidate_id", candidate_id)),
@@ -122,8 +135,9 @@ def _finding(
         severity=int(raw["severity"]),
         cell_signature=str(raw["cell_signature"]),
         replay_success=bool(raw["replay_success"]),
-        private_survival_probability=float(
-            raw.get("private_survival_probability", 1.0)
+        private_survival_probability=resolve_private_survival_probability(
+            raw,
+            timing_calibrations,
         ),
     )
 
