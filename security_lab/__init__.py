@@ -2,7 +2,18 @@ from .belief import HypothesisBelief, initial_beliefs, select_next_probe, update
 from .budget import BudgetPlan, allocate_budget
 from .budget_ledger import BudgetLedger, BudgetStage
 from .candidate_pack import CandidatePackage, CandidateRecord, package_candidates
+from .championship import ChampionshipResult, select_championship_portfolio
+from .championship_io import championship_result_payload, run_championship_from_mapping
 from .competition import CompetitionAdapter, CompetitionSpec, KaggleAgentSecurityAdapter
+from .competition_objective import (
+    CompetitionCandidateProfile,
+    CompetitionFindingSignal,
+    CompetitionPortfolioSelection,
+    SecurityPredicate,
+    expected_private_raw_score,
+    official_normalized_score,
+    select_private_robust_portfolio,
+)
 from .compiler import CompiledRequest, GenericChatCompiler, ModelCompiler
 from .compute import ComputeRequest, ComputeTarget, select_compute_target
 from .control_plane_bridge import ControlPlaneReplayAdapter
@@ -141,8 +152,12 @@ __all__ = [
     "CandidatePackage",
     "CandidateProfile",
     "CandidateRecord",
+    "ChampionshipResult",
     "CompiledRequest",
     "CompetitionAdapter",
+    "CompetitionCandidateProfile",
+    "CompetitionFindingSignal",
+    "CompetitionPortfolioSelection",
     "CompetitionSpec",
     "CompositionKind",
     "ComputeRequest",
@@ -206,6 +221,7 @@ __all__ = [
     "RuntimeSensitivityReport",
     "RuntimeTelemetry",
     "RuntimeVariant",
+    "SecurityPredicate",
     "SemanticGene",
     "SemanticGenome",
     "SemanticScore",
@@ -239,11 +255,13 @@ __all__ = [
     "build_robustness_envelope",
     "build_runtime_matrix",
     "build_sweep",
+    "championship_result_payload",
     "compile_minimal_falsification_probe",
     "compile_probe",
     "decompose_evaluator",
     "estimate_throughput",
     "evaluate_target_replay",
+    "expected_private_raw_score",
     "fit_linear_transfer",
     "fit_ridge_transfer",
     "freeze_candidates",
@@ -253,6 +271,7 @@ __all__ = [
     "load_records",
     "measure_runtime",
     "minimize_winning_trace",
+    "official_normalized_score",
     "orchestrate_research_roles",
     "package_candidates",
     "rank_and_judge",
@@ -263,16 +282,19 @@ __all__ = [
     "replace_gene_text",
     "replay_probe",
     "run_cases",
+    "run_championship_from_mapping",
     "run_research_loop",
     "run_research_loop_from_mapping",
     "runtime_variant_key",
     "score_families",
+    "select_championship_portfolio",
     "select_compute_target",
     "select_correlation_diverse_portfolio",
     "select_diverse_portfolio",
     "select_frontier",
     "select_next_probe",
     "select_nuisance_stable_candidates",
+    "select_private_robust_portfolio",
     "sha256_file",
     "stable_hash",
     "summarize_hypothesis_evidence",
