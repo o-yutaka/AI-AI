@@ -11,6 +11,7 @@ from research_bundle.models import SecurityResearchBundle, SecurityResearchBundl
 
 from .budget import allocate_budget
 from .candidate_pack import CandidateRecord, package_candidates
+from .championship_io import championship_result_payload, run_championship_from_mapping
 from .competition import KaggleAgentSecurityAdapter
 from .compute import ComputeRequest, ComputeTarget, select_compute_target
 from .dataset import freeze_dataset
@@ -48,6 +49,11 @@ def _register_commands(commands: argparse._SubParsersAction[argparse.ArgumentPar
         commands,
         "rank-winning-portfolio",
         help_text="JSON winning-strategy evidence specification",
+    )
+    _path_command(
+        commands,
+        "championship-run",
+        help_text="JSON hard-gated private-objective championship specification",
     )
     _path_command(commands, "kaggle-stage", help_text="JSON scratch-kernel specification")
     _path_command(commands, "kaggle-run", help_text="JSON remote-run specification")
@@ -114,6 +120,10 @@ def _dispatch(args: argparse.Namespace) -> int:
     if args.command == "rank-winning-portfolio":
         result = rank_winning_portfolio_from_mapping(_json_object(args.path))
         _print_json(winning_strategy_result_payload(result))
+        return 0
+    if args.command == "championship-run":
+        result = run_championship_from_mapping(_json_object(args.path))
+        _print_json(championship_result_payload(result))
         return 0
     if args.command == "kaggle-stage":
         return _kaggle_stage(args.path)
