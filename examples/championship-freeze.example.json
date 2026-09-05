@@ -1,0 +1,10 @@
+{
+  "competition_slug": "ai-agent-security-multi-step-tool-attacks",
+  "source_commit_sha": "1111111111111111111111111111111111111111",
+  "candidate_ids": ["candidate-a", "candidate-b"],
+  "artifacts": {
+    "candidate_pack": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "championship_risk_spec": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "runtime_contract": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}
