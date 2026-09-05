@@ -31,7 +31,7 @@ jobs:
           pip install -r requirements.lock.txt
           pip install --no-deps -e .
       - name: Ruff
-        run: ruff check .
+        run: ruff check . --diff
       - name: Tests
         run: pytest -q
       - name: Package and CLI smoke
