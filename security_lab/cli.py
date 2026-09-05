@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from research_bundle.canonical import bundle_sha256, canonical_json
-from research_bundle.models import SecurityResearchBundle
+from research_bundle.models import SecurityResearchBundle, SecurityResearchBundleV2
 
 from .budget import allocate_budget
 from .candidate_pack import CandidateRecord, package_candidates
@@ -16,6 +16,7 @@ from .compute import ComputeRequest, ComputeTarget, select_compute_target
 from .dataset import freeze_dataset
 from .kaggle_remote import KaggleRemoteRunner, KaggleRemoteSpec, stage_scratch_script
 from .manifest import ExperimentManifest
+from .research_loop_io import run_research_loop_from_mapping
 from .research_plan import build_research_plan
 from .winning_io import rank_winning_portfolio_from_mapping, winning_strategy_result_payload
 
@@ -38,6 +39,11 @@ def _register_commands(commands: argparse._SubParsersAction[argparse.ArgumentPar
     budget.add_argument("total_units", type=float)
     _path_command(commands, "package-candidates")
     _path_command(commands, "plan-research")
+    _path_command(
+        commands,
+        "research-run",
+        help_text="JSON recorded-evidence research-loop specification",
+    )
     _path_command(
         commands,
         "rank-winning-portfolio",
@@ -103,6 +109,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return 0
     if args.command == "plan-research":
         return _plan_research(args.path)
+    if args.command == "research-run":
+        return _research_run(args.path)
     if args.command == "rank-winning-portfolio":
         result = rank_winning_portfolio_from_mapping(_json_object(args.path))
         _print_json(winning_strategy_result_payload(result))
@@ -139,6 +147,31 @@ def _bundle_command(command: str, path: Path) -> int:
         )
     else:
         print(canonical_json(bundle))
+    return 0
+
+
+def _research_run(path: str) -> int:
+    raw = _json_object(path)
+    bundle = run_research_loop_from_mapping(raw)
+    content = canonical_json(bundle)
+    output_path = raw.get("output_path")
+    if output_path is None:
+        print(content)
+        return 0
+
+    destination = Path(str(output_path))
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(content + "\n", encoding="utf-8")
+    _print_json(
+        {
+            "schema_version": bundle.schema_version,
+            "sha256": bundle_sha256(bundle),
+            "output_path": str(destination),
+            "knowledge_materials": len(bundle.knowledge_materials),
+            "research_decisions": len(bundle.research_decisions),
+            "environments": len(bundle.environments),
+        }
+    )
     return 0
 
 
@@ -277,8 +310,16 @@ def _print_json(value: Any) -> None:
     print(json.dumps(value, sort_keys=True))
 
 
-def _load_bundle(path: Path) -> SecurityResearchBundle:
-    return SecurityResearchBundle.model_validate_json(path.read_text(encoding="utf-8"))
+def _load_bundle(path: Path) -> SecurityResearchBundle | SecurityResearchBundleV2:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("bundle must be a JSON object")
+    schema = raw.get("schema_version")
+    if schema == "security-research-bundle.v1":
+        return SecurityResearchBundle.model_validate(raw)
+    if schema == "security-research-bundle.v2":
+        return SecurityResearchBundleV2.model_validate(raw)
+    raise ValueError(f"unsupported research bundle schema: {schema}")
 
 
 if __name__ == "__main__":
