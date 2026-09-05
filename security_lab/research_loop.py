@@ -23,7 +23,6 @@ from .hypothesis import (
 from .leakage import ResearchPurpose, assert_split_allowed
 from .models import Hypothesis, Observation, Probe, ProbeVerdict
 
-
 ProbeExecutor = Callable[[Probe], Observation]
 
 
