@@ -67,7 +67,11 @@ def run_risk_championship_from_mapping(raw: Mapping[str, Any]) -> RiskAwareChamp
             "competition profiles are not bound to winning-strategy assessments: "
             + ",".join(unknown)
         )
-    eligible_profiles = [profile for profile in profiles if assessments[profile.candidate_id].eligible]
+    eligible_profiles = [
+        profile
+        for profile in profiles
+        if assessments[profile.candidate_id].eligible
+    ]
     eligible_ids = {profile.candidate_id for profile in eligible_profiles}
 
     scenarios = tuple(
@@ -114,7 +118,9 @@ def run_risk_championship_from_mapping(raw: Mapping[str, Any]) -> RiskAwareChamp
         stage="private_scenario_and_replay_wall_selection",
         candidates_considered=considered,
         selected=sorted(selected),
-        rejected=sorted(candidate_id for candidate_id in considered if candidate_id not in selected),
+        rejected=sorted(
+            candidate_id for candidate_id in considered if candidate_id not in selected
+        ),
         rationale=(
             "filtered by exact winning-strategy gates, capped each model by evidence-bound atomic "
             "replay-wall risk, then maximized expected/worst-case private scenario score per "
@@ -176,7 +182,9 @@ def risk_championship_result_payload(result: RiskAwareChampionshipRun) -> dict[s
             },
         },
         "research_decision": result.decision.model_dump(mode="json"),
-        "knowledge_materials": [item.model_dump(mode="json") for item in result.knowledge_materials],
+        "knowledge_materials": [
+            item.model_dump(mode="json") for item in result.knowledge_materials
+        ],
     }
 
 
