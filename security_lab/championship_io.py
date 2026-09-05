@@ -68,8 +68,8 @@ def _resolve_runtime_budgets(
     provided = sum(value is not None for value in (explicit, contract_raw, profile_name))
     if provided > 1:
         raise ValueError(
-            "provide exactly one of runtime_budget_by_model, runtime_contract, "
-            "or runtime_contract_profile"
+            "provide either runtime_budget_by_model or runtime_contract, "
+            "or runtime_contract_profile; not more than one"
         )
     if explicit is not None:
         return {
