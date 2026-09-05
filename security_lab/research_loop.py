@@ -7,7 +7,11 @@ from research_bundle.models import KnowledgeMaterial, ResearchDecisionRecord
 
 from .belief import HypothesisBelief, initial_beliefs, select_next_probe, update_belief
 from .budget_ledger import BudgetLedger, BudgetStage
-from .hypothesis import HypothesisEvidenceState, HypothesisGraph, summarize_hypothesis_evidence
+from .hypothesis import (
+    HypothesisEvidenceState,
+    HypothesisGraph,
+    summarize_hypothesis_evidence,
+)
 from .leakage import ResearchPurpose, assert_split_allowed
 from .models import Hypothesis, Observation, Probe, ProbeVerdict
 
