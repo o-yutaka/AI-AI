@@ -132,7 +132,27 @@ from .semantic_search import (
 from .session import ResearchSession
 from .target_gate import TargetReplayExpectation, TargetReplayVerdict, evaluate_target_replay
 from .telemetry import RuntimeTelemetry, measure_runtime
+from .termination_economics import (
+    TerminationCandidateReport,
+    TerminationEconomicsResult,
+    TerminationRuntimeSample,
+    analyze_termination_economics,
+    post_success_capacity_gain,
+)
 from .throughput import ThroughputEstimate, estimate_throughput
+from .timing_signal import (
+    TimingCalibration,
+    TimingInferenceReport,
+    TimingOutcome,
+    TimingSample,
+    fit_timing_calibration,
+    infer_timing_survival,
+    timing_success_probability,
+)
+from .timing_signal_io import (
+    resolve_private_survival_probability,
+    timing_calibrations_from_mapping,
+)
 from .transfer import (
     RidgeTransferEstimate,
     TransferEstimate,
@@ -246,7 +266,14 @@ __all__ = [
     "SweepCase",
     "TargetReplayExpectation",
     "TargetReplayVerdict",
+    "TerminationCandidateReport",
+    "TerminationEconomicsResult",
+    "TerminationRuntimeSample",
     "ThroughputEstimate",
+    "TimingCalibration",
+    "TimingInferenceReport",
+    "TimingOutcome",
+    "TimingSample",
     "TraceEvaluation",
     "Trajectory",
     "TransferEstimate",
@@ -258,6 +285,7 @@ __all__ = [
     "allocate_budget",
     "analyze_nuisance_sensitivity",
     "analyze_runtime_sensitivity",
+    "analyze_termination_economics",
     "append_record",
     "assert_disjoint_instance_sets",
     "assert_split_allowed",
@@ -280,8 +308,10 @@ __all__ = [
     "expected_private_raw_score",
     "fit_linear_transfer",
     "fit_ridge_transfer",
+    "fit_timing_calibration",
     "freeze_candidates",
     "freeze_dataset",
+    "infer_timing_survival",
     "initial_beliefs",
     "judge_family",
     "kaggle_host_faq_contract",
@@ -292,6 +322,7 @@ __all__ = [
     "orchestrate_research_roles",
     "package_candidates",
     "plan_runtime_capacity",
+    "post_success_capacity_gain",
     "rank_and_judge",
     "rank_winning_portfolio",
     "rank_winning_portfolio_from_mapping",
@@ -299,6 +330,7 @@ __all__ = [
     "reorder_genes",
     "replace_gene_text",
     "replay_probe",
+    "resolve_private_survival_probability",
     "run_cases",
     "run_championship_from_mapping",
     "run_research_loop",
@@ -318,6 +350,8 @@ __all__ = [
     "sha256_file",
     "stable_hash",
     "summarize_hypothesis_evidence",
+    "timing_calibrations_from_mapping",
+    "timing_success_probability",
     "toggle_gene",
     "update_belief",
     "validate_candidate_shapes",
