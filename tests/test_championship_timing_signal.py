@@ -77,13 +77,43 @@ def test_timing_calibration_can_drive_private_survival_selection() -> None:
             "private-path": {
                 "minimum_separation_s": 1.0,
                 "samples": [
-                    {"sample_id": "s1", "outcome": "SUCCESS", "elapsed_seconds": 1.0, "environment_key": environment_key},
-                    {"sample_id": "s2", "outcome": "SUCCESS", "elapsed_seconds": 1.1, "environment_key": environment_key},
-                    {"sample_id": "s3", "outcome": "SUCCESS", "elapsed_seconds": 0.9, "environment_key": environment_key},
-                    {"sample_id": "b1", "outcome": "BLOCKED", "elapsed_seconds": 8.0, "environment_key": environment_key},
-                    {"sample_id": "b2", "outcome": "BLOCKED", "elapsed_seconds": 8.1, "environment_key": environment_key},
-                    {"sample_id": "b3", "outcome": "BLOCKED", "elapsed_seconds": 7.9, "environment_key": environment_key}
-                ]
+                    {
+                        "sample_id": "s1",
+                        "outcome": "SUCCESS",
+                        "elapsed_seconds": 1.0,
+                        "environment_key": environment_key,
+                    },
+                    {
+                        "sample_id": "s2",
+                        "outcome": "SUCCESS",
+                        "elapsed_seconds": 1.1,
+                        "environment_key": environment_key,
+                    },
+                    {
+                        "sample_id": "s3",
+                        "outcome": "SUCCESS",
+                        "elapsed_seconds": 0.9,
+                        "environment_key": environment_key,
+                    },
+                    {
+                        "sample_id": "b1",
+                        "outcome": "BLOCKED",
+                        "elapsed_seconds": 8.0,
+                        "environment_key": environment_key,
+                    },
+                    {
+                        "sample_id": "b2",
+                        "outcome": "BLOCKED",
+                        "elapsed_seconds": 8.1,
+                        "environment_key": environment_key,
+                    },
+                    {
+                        "sample_id": "b3",
+                        "outcome": "BLOCKED",
+                        "elapsed_seconds": 7.9,
+                        "environment_key": environment_key,
+                    },
+                ],
             }
         },
         "competition_profiles": [
@@ -98,9 +128,9 @@ def test_timing_calibration_can_drive_private_survival_selection() -> None:
                         "severity": 5,
                         "cell_signature": "cell-public",
                         "replay_success": True,
-                        "private_survival_probability": 0.2
+                        "private_survival_probability": 0.2,
                     }
-                ]
+                ],
             },
             {
                 "candidate_id": "timing-stable",
@@ -116,12 +146,12 @@ def test_timing_calibration_can_drive_private_survival_selection() -> None:
                         "timing_signal": {
                             "calibration_id": "private-path",
                             "elapsed_seconds": [1.0, 1.2, 1.1],
-                            "environment_key": environment_key
-                        }
+                            "environment_key": environment_key,
+                        },
                     }
-                ]
-            }
-        ]
+                ],
+            },
+        ],
     }
 
     result = run_championship_from_mapping(raw)
@@ -157,12 +187,12 @@ def test_finding_cannot_double_source_private_survival() -> None:
                         "timing_signal": {
                             "calibration_id": "missing",
                             "elapsed_seconds": [1.0],
-                            "environment_key": "env"
-                        }
+                            "environment_key": "env",
+                        },
                     }
-                ]
+                ],
             }
-        ]
+        ],
     }
 
     try:
